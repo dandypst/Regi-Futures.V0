@@ -16,11 +16,32 @@ function sign(params, secret) {
 
 function client() {
   const cfg = getBinanceConfig();
-  const ax = axios.create({
+
+  // Proxy support — set HTTPS_PROXY di .env jika Binance diblokir ISP
+  // Contoh: HTTPS_PROXY=http://127.0.0.1:7890
+  const proxyUrl = process.env.HTTPS_PROXY || process.env.https_proxy || null;
+
+  const axConfig = {
     baseURL: cfg.baseUrl,
     headers: { 'X-MBX-APIKEY': cfg.apiKey },
     timeout: 10000,
-  });
+  };
+
+  if (proxyUrl) {
+    try {
+      const u = new URL(proxyUrl);
+      axConfig.proxy = {
+        protocol: u.protocol.replace(':', ''),
+        host:     u.hostname,
+        port:     parseInt(u.port) || (u.protocol === 'https:' ? 443 : 80),
+        ...(u.username ? { auth: { username: u.username, password: u.password } } : {}),
+      };
+    } catch (e) {
+      logger.warn(MOD, `Proxy URL tidak valid: ${proxyUrl}`);
+    }
+  }
+
+  const ax = axios.create(axConfig);
   return { ax, cfg };
 }
 
