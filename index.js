@@ -11,7 +11,7 @@ import { loadTradeHistory, evolveThresholds, getEvolveSummary, saveTradeToHistor
 import { runScreeningAgent, runManagementAgent } from './agent.js';
 import { openPosition, closePositionWithReason, syncPositions } from './executor.js';
 import { initTelegram, registerTelegramHandlers, send, sendCycleReport } from './telegram.js';
-import { initDashboard } from './dashboard-server.js';
+import { initDashboard, broadcastState } from './dashboard-server.js';
 import { checkConnectivity, getBalance, getAllFuturesPairs } from './binance.js';
 import { recordPairTrade } from './pool-memory.js';
 
@@ -45,6 +45,8 @@ async function loadPairs() {
     const filtered  = blacklist.length ? allPairs.filter(p => !blacklist.includes(p)) : allPairs;
     config.pairs = filtered;
     logger.sys(MOD, `autoPairs: ${filtered.length} pairs aktif`);
+    // Broadcast update ke dashboard agar jumlah pairs langsung terefleksi
+    try { broadcastState(); } catch (_) {}
     return filtered;
   } catch (e) {
     logger.error(MOD, `loadPairs gagal: ${e.message}`);
