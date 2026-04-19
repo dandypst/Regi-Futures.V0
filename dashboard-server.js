@@ -12,6 +12,7 @@ import { config } from './config.js';
 import { getLessons } from './lessons.js';
 import { getAllMemory } from './pool-memory.js';
 import { getEvolveSummary, loadTradeHistory } from './evolve.js';
+import { getRadarData } from './agent.js';
 import { getProxyStatus } from './binance.js';
 import { onLog, logger } from './logger.js'; // FIX: single import line
 
@@ -51,7 +52,7 @@ function broadcast(msg) {
 // Stream logs to dashboard in real time
 onLog((entry) => {
   broadcast({ type: 'log', data: entry });
-  if (entry.level === 'TRADE' || entry.level === 'SYS') {
+  if (entry.level === 'TRADE' || entry.level === 'SYS' || (entry.level === 'AI' && entry.msg?.includes('Radar'))) {
     broadcast({ type: 'state', data: getFullState() });
   }
 });
@@ -170,6 +171,10 @@ app.get('/api/memory', (_req, res) => {
 
 app.get('/api/history', (_req, res) => {
   res.json(loadTradeHistory().slice(-50));
+});
+
+app.get('/api/radar', (_req, res) => {
+  res.json(getRadarData());
 });
 
 app.get('/api/evolve/summary', (_req, res) => {
