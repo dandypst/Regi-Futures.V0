@@ -1,6 +1,6 @@
 // binance.js — Binance Futures REST API wrapper
-// Handles HMAC signing, testnet/live endpoint switching
-// DRY_RUN=true → skip real order submission (still hits testnet for reads)
+// Smart proxy: auto-fallback ke proxy jika koneksi langsung diblokir ISP
+// Retry direct setiap 5 menit untuk kembali ke mode normal
 
 import axios from 'axios';
 import { createHmac } from 'crypto';
@@ -9,48 +9,186 @@ import { logger } from './logger.js';
 
 const MOD = 'BINANCE';
 
+// ── HMAC Signing ──────────────────────────────────────────────────────────────
+
 function sign(params, secret) {
   const qs = new URLSearchParams(params).toString();
   return createHmac('sha256', secret).update(qs).digest('hex');
 }
 
-function client() {
-  const cfg = getBinanceConfig();
+// ── Smart Proxy Manager ───────────────────────────────────────────────────────
+// Logika:
+// 1. Coba koneksi langsung (direct) terlebih dahulu
+// 2. Jika terdeteksi diblokir ISP (SSL error, iiniternetpositif) → aktifkan proxy
+// 3. Setiap 5 menit, coba direct lagi — jika berhasil, kembali ke direct mode
+// 4. Proxy tetap standby (tidak dimatikan), hanya diaktifkan kalau perlu
 
-  // Proxy support — set HTTPS_PROXY di .env jika Binance diblokir ISP
-  // Contoh: HTTPS_PROXY=http://127.0.0.1:7890
+const proxyState = {
+  useProxy:      false,
+  failCount:     0,
+  lastRetryDirect: 0,
+  RETRY_INTERVAL:  5 * 60 * 1000, // 5 menit
+};
+
+// Kata kunci yang menandakan koneksi diblokir ISP Indonesia
+const BLOCK_SIGNATURES = [
+  'iiniternetpositif',
+  'internetpositif',
+  'altnames',
+  'CERT_',
+  'ERR_CERT',
+  'certificate',
+  'self signed',
+  'unable to verify',
+];
+
+function isBlockedByISP(err) {
+  const msg = String(err?.message || '') + String(err?.code || '');
+  return BLOCK_SIGNATURES.some(kw => msg.toLowerCase().includes(kw.toLowerCase()));
+}
+
+function parseProxy(proxyUrl) {
+  try {
+    const u = new URL(proxyUrl);
+    return {
+      protocol: u.protocol.replace(':', ''),
+      host:     u.hostname,
+      port:     parseInt(u.port) || (u.protocol === 'https:' ? 443 : 80),
+      ...(u.username ? {
+        auth: {
+          username: decodeURIComponent(u.username),
+          password: decodeURIComponent(u.password || ''),
+        },
+      } : {}),
+    };
+  } catch (_) {
+    return null;
+  }
+}
+
+function buildAxios(useProxy) {
+  const cfg      = getBinanceConfig();
   const proxyUrl = process.env.HTTPS_PROXY || process.env.https_proxy || null;
 
   const axConfig = {
-    baseURL: cfg.baseUrl,
-    headers: { 'X-MBX-APIKEY': cfg.apiKey },
-    timeout: 10000,
+    baseURL:  cfg.baseUrl,
+    headers:  { 'X-MBX-APIKEY': cfg.apiKey },
+    timeout:  12000,
+    proxy:    false, // default: matikan proxy env-var agar tidak auto-detect
   };
 
-  if (proxyUrl) {
-    try {
-      const u = new URL(proxyUrl);
-      axConfig.proxy = {
-        protocol: u.protocol.replace(':', ''),
-        host:     u.hostname,
-        port:     parseInt(u.port) || (u.protocol === 'https:' ? 443 : 80),
-        ...(u.username ? { auth: { username: u.username, password: u.password } } : {}),
-      };
-    } catch (e) {
+  if (useProxy && proxyUrl) {
+    const parsed = parseProxy(proxyUrl);
+    if (parsed) {
+      axConfig.proxy = parsed;
+    } else {
       logger.warn(MOD, `Proxy URL tidak valid: ${proxyUrl}`);
     }
   }
 
-  const ax = axios.create(axConfig);
-  return { ax, cfg };
+  return { ax: axios.create(axConfig), cfg };
+}
+
+// Core request dengan smart fallback
+async function smartRequest(method, url, options = {}) {
+  const proxyUrl = process.env.HTTPS_PROXY || process.env.https_proxy || null;
+  const hasProxy = !!proxyUrl;
+
+  // ── Coba retry koneksi langsung (jika sedang di proxy mode) ──────────────
+  if (proxyState.useProxy && hasProxy) {
+    const now = Date.now();
+    if (now - proxyState.lastRetryDirect > proxyState.RETRY_INTERVAL) {
+      proxyState.lastRetryDirect = now;
+      logger.info(MOD, '🔁 Retry koneksi langsung (setiap 5 menit)...');
+      try {
+        const { ax } = buildAxios(false);
+        const res = await ax.request({ method, url, ...options });
+        // Berhasil → kembali ke direct mode
+        proxyState.useProxy  = false;
+        proxyState.failCount = 0;
+        logger.sys(MOD, '✅ Koneksi langsung pulih — kembali ke direct mode');
+        return res;
+      } catch (_) {
+        logger.info(MOD, 'Koneksi langsung masih gagal — tetap pakai proxy');
+      }
+    }
+  }
+
+  // ── Request dengan mode aktif saat ini ───────────────────────────────────
+  const { ax } = buildAxios(proxyState.useProxy && hasProxy);
+
+  try {
+    const res = await ax.request({ method, url, ...options });
+    if (proxyState.failCount > 0) proxyState.failCount = 0;
+    return res;
+
+  } catch (err) {
+    const blocked = isBlockedByISP(err);
+
+    // Terdeteksi blokir ISP → aktifkan proxy otomatis
+    if (blocked && hasProxy && !proxyState.useProxy) {
+      proxyState.useProxy        = true;
+      proxyState.failCount       = 0;
+      proxyState.lastRetryDirect = Date.now();
+      logger.warn(MOD, '🔀 Diblokir ISP → proxy diaktifkan otomatis');
+
+      const { ax: axProxy } = buildAxios(true);
+      try {
+        const res = await axProxy.request({ method, url, ...options });
+        logger.sys(MOD, '✅ Request berhasil via proxy');
+        return res;
+      } catch (proxyErr) {
+        logger.error(MOD, `Proxy juga gagal: ${proxyErr.message}`);
+        throw proxyErr;
+      }
+    }
+
+    // Gagal berulang (bukan blokir) → aktifkan proxy sebagai precaution
+    if (!blocked && !proxyState.useProxy) {
+      proxyState.failCount++;
+      if (proxyState.failCount >= 3 && hasProxy) {
+        proxyState.useProxy        = true;
+        proxyState.lastRetryDirect = Date.now();
+        logger.warn(MOD, `⚠️ ${proxyState.failCount}x gagal berturut-turut → proxy diaktifkan sebagai precaution`);
+      }
+    }
+
+    throw err;
+  }
+}
+
+// Expose status proxy untuk dashboard
+export function getProxyStatus() {
+  const proxyUrl = process.env.HTTPS_PROXY || process.env.https_proxy || null;
+  return {
+    configured: !!proxyUrl,
+    active:     proxyState.useProxy,
+    failCount:  proxyState.failCount,
+    proxyUrl:   proxyUrl
+      ? proxyUrl.replace(/(?<=:\/\/[^:]*):([^@]*)@/, ':***@')
+      : null,
+  };
+}
+
+// ── Internal HTTP helpers ─────────────────────────────────────────────────────
+
+async function rawGet(path, params = {}) {
+  try {
+    const res = await smartRequest('GET', path, { params });
+    return res.data;
+  } catch (e) {
+    const msg = e.response?.data?.msg || e.message;
+    logger.error(MOD, `GET ${path} failed: ${msg}`);
+    throw new Error(msg);
+  }
 }
 
 async function signedGet(path, params = {}) {
-  const { ax, cfg } = client();
+  const { cfg } = buildAxios(false);
   const p = { ...params, timestamp: Date.now() };
   p.signature = sign(p, cfg.apiSecret);
   try {
-    const res = await ax.get(path, { params: p });
+    const res = await smartRequest('GET', path, { params: p });
     return res.data;
   } catch (e) {
     const msg = e.response?.data?.msg || e.message;
@@ -60,11 +198,11 @@ async function signedGet(path, params = {}) {
 }
 
 async function signedPost(path, params = {}) {
-  const { ax, cfg } = client();
+  const { cfg } = buildAxios(false);
   const p = { ...params, timestamp: Date.now() };
   p.signature = sign(p, cfg.apiSecret);
   try {
-    const res = await ax.post(path, null, { params: p });
+    const res = await smartRequest('POST', path, { params: p });
     return res.data;
   } catch (e) {
     const msg = e.response?.data?.msg || e.message;
@@ -74,11 +212,11 @@ async function signedPost(path, params = {}) {
 }
 
 async function signedDelete(path, params = {}) {
-  const { ax, cfg } = client();
+  const { cfg } = buildAxios(false);
   const p = { ...params, timestamp: Date.now() };
   p.signature = sign(p, cfg.apiSecret);
   try {
-    const res = await ax.delete(path, { params: p });
+    const res = await smartRequest('DELETE', path, { params: p });
     return res.data;
   } catch (e) {
     const msg = e.response?.data?.msg || e.message;
@@ -90,70 +228,35 @@ async function signedDelete(path, params = {}) {
 // ── Public endpoints ──────────────────────────────────────────────────────────
 
 export async function getExchangeInfo() {
-  const { ax } = client();
-  try {
-    const res = await ax.get('/fapi/v1/exchangeInfo');
-    return res.data;
-  } catch (e) {
-    throw new Error(e.response?.data?.msg || e.message);
-  }
+  return rawGet('/fapi/v1/exchangeInfo');
 }
 
 export async function getKlines(symbol, interval = '1h', limit = 100) {
-  const { ax } = client();
-  try {
-    const res = await ax.get('/fapi/v1/klines', { params: { symbol, interval, limit } });
-    return res.data.map(k => ({
-      time:   k[0],
-      open:   parseFloat(k[1]),
-      high:   parseFloat(k[2]),
-      low:    parseFloat(k[3]),
-      close:  parseFloat(k[4]),
-      volume: parseFloat(k[5]),
-    }));
-  } catch (e) {
-    throw new Error(e.response?.data?.msg || e.message);
-  }
+  const data = await rawGet('/fapi/v1/klines', { symbol, interval, limit });
+  return data.map(k => ({
+    time:   k[0],
+    open:   parseFloat(k[1]),
+    high:   parseFloat(k[2]),
+    low:    parseFloat(k[3]),
+    close:  parseFloat(k[4]),
+    volume: parseFloat(k[5]),
+  }));
 }
 
 export async function getTicker(symbol) {
-  const { ax } = client();
-  try {
-    const res = await ax.get('/fapi/v1/ticker/24hr', { params: { symbol } });
-    return res.data;
-  } catch (e) {
-    throw new Error(e.response?.data?.msg || e.message);
-  }
+  return rawGet('/fapi/v1/ticker/24hr', { symbol });
 }
 
 export async function getOrderBook(symbol, limit = 20) {
-  const { ax } = client();
-  try {
-    const res = await ax.get('/fapi/v1/depth', { params: { symbol, limit } });
-    return res.data;
-  } catch (e) {
-    throw new Error(e.response?.data?.msg || e.message);
-  }
+  return rawGet('/fapi/v1/depth', { symbol, limit });
 }
 
 export async function getFundingRate(symbol) {
-  const { ax } = client();
-  try {
-    const res = await ax.get('/fapi/v1/premiumIndex', { params: { symbol } });
-    return res.data;
-  } catch (e) {
-    throw new Error(e.response?.data?.msg || e.message);
-  }
+  return rawGet('/fapi/v1/premiumIndex', { symbol });
 }
 
 export async function getOpenInterest(symbol) {
-  const { ax } = client();
-  try {
-    const res = await ax.get('/fapi/v1/openInterest', { params: { symbol } });
-    return res.data;
-  } catch (e) {
-    throw new Error(e.response?.data?.msg || e.message);
-  }
+  return rawGet('/fapi/v1/openInterest', { symbol });
 }
 
 // ── Account / Trade endpoints ─────────────────────────────────────────────────
@@ -176,8 +279,7 @@ export async function getAllPositions() {
 }
 
 export async function getOpenOrders(symbol) {
-  const params = symbol ? { symbol } : {};
-  return signedGet('/fapi/v1/openOrders', params);
+  return signedGet('/fapi/v1/openOrders', symbol ? { symbol } : {});
 }
 
 export async function getOrderHistory(symbol, limit = 50) {
@@ -192,7 +294,6 @@ export async function setMarginType(symbol, marginType = 'ISOLATED') {
   try {
     return await signedPost('/fapi/v1/marginType', { symbol, marginType });
   } catch (e) {
-    // Code -4046: "No need to change margin type" — not an error
     if (e.message.includes('4046') || e.message.toLowerCase().includes('margin type')) {
       return { msg: 'already set' };
     }
@@ -201,8 +302,6 @@ export async function setMarginType(symbol, marginType = 'ISOLATED') {
 }
 
 export async function placeOrder(params) {
-  // FIX: DRY_RUN=true → simulate order (no real submission)
-  // testnet mode → REAL orders go to testnet endpoint (not skipped)
   if (process.env.DRY_RUN === 'true') {
     logger.trade(MOD, `[DRY-RUN] Simulated order`, params);
     return {
@@ -228,15 +327,13 @@ export async function cancelAllOrders(symbol) {
 }
 
 export async function closePosition(symbol, positionAmt) {
-  // FIX: do NOT send positionSide=BOTH with reduceOnly — conflicts in hedge mode
-  // Use reduceOnly: true only, let Binance figure out the side
-  const qty = Math.abs(parseFloat(positionAmt));
+  const qty  = Math.abs(parseFloat(positionAmt));
   const side = parseFloat(positionAmt) > 0 ? 'SELL' : 'BUY';
   return placeOrder({
     symbol,
     side,
-    type: 'MARKET',
-    quantity: qty.toFixed(3),
+    type:       'MARKET',
+    quantity:   qty.toFixed(3),
     reduceOnly: true,
   });
 }
@@ -245,9 +342,10 @@ export async function closePosition(symbol, positionAmt) {
 
 export async function checkConnectivity() {
   try {
-    const { ax } = client();
-    await ax.get('/fapi/v1/ping');
-    logger.info(MOD, `Binance ${getBinanceConfig().mode} connectivity OK`);
+    await rawGet('/fapi/v1/ping');
+    const proxy = getProxyStatus();
+    const via   = proxy.active ? ` (via proxy: ${proxy.proxyUrl})` : ' (direct)';
+    logger.info(MOD, `Binance ${getBinanceConfig().mode} connectivity OK${via}`);
     return true;
   } catch (e) {
     logger.error(MOD, `Connectivity check failed: ${e.message}`);
@@ -255,12 +353,11 @@ export async function checkConnectivity() {
   }
 }
 
-// ── USD-M Futures pair discovery ─────────────────────────────────────────────
+// ── Pair discovery ────────────────────────────────────────────────────────────
 
-// Cache exchangeInfo agar tidak fetch berulang-ulang setiap screening cycle
 let _exchangeInfoCache = null;
 let _exchangeInfoTs    = 0;
-const CACHE_TTL_MS     = 60 * 60 * 1000; // 1 jam
+const CACHE_TTL_MS     = 60 * 60 * 1000;
 
 export async function getExchangeInfoCached() {
   if (_exchangeInfoCache && Date.now() - _exchangeInfoTs < CACHE_TTL_MS) {
@@ -271,15 +368,6 @@ export async function getExchangeInfoCached() {
   return _exchangeInfoCache;
 }
 
-/**
- * Ambil semua pair USD-M Futures yang aktif tanpa SDK.
- * Satu GET ke /fapi/v1/exchangeInfo sudah cukup.
- *
- * @param {object}  opts
- * @param {string}  [opts.quoteAsset='USDT']  — filter quote (USDT, BUSD, dll)
- * @param {boolean} [opts.perpOnly=true]       — hanya PERPETUAL, bukan quarterly
- * @returns {string[]}  e.g. ['BTCUSDT','ETHUSDT','BNBUSDT',...]
- */
 export async function getAllFuturesPairs({ quoteAsset = 'USDT', perpOnly = true } = {}) {
   try {
     const info = await getExchangeInfoCached();
@@ -291,7 +379,7 @@ export async function getAllFuturesPairs({ quoteAsset = 'USDT', perpOnly = true 
       )
       .map(s => s.symbol)
       .sort();
-    logger.info(MOD, `USD-M Futures aktif: ${symbols.length} pair`);
+    logger.info(MOD, `USD-M Futures aktif: ${symbols.length} pairs`);
     return symbols;
   } catch (e) {
     logger.error(MOD, `getAllFuturesPairs gagal: ${e.message}`);
@@ -299,13 +387,6 @@ export async function getAllFuturesPairs({ quoteAsset = 'USDT', perpOnly = true 
   }
 }
 
-/**
- * Ambil presisi qty (stepSize) dan harga (tickSize) per symbol.
- * Dipakai executor.js untuk rounding qty yang benar-benar akurat.
- *
- * @param {string} symbol
- * @returns {{ qtyPrecision, pricePrecision, minQty, minNotional }}
- */
 export async function getSymbolPrecision(symbol) {
   try {
     const info = await getExchangeInfoCached();
@@ -322,10 +403,10 @@ export async function getSymbolPrecision(symbol) {
     return {
       qtyPrecision:   stepSize >= 1 ? 0 : Math.round(-Math.log10(stepSize)),
       pricePrecision: tickSize >= 1  ? 0 : Math.round(-Math.log10(tickSize)),
-      minQty:         parseFloat(lot.minQty          || '0.001'),
-      minNotional:    parseFloat(notional.notional   || '5'),
+      minQty:         parseFloat(lot.minQty        || '0.001'),
+      minNotional:    parseFloat(notional.notional || '5'),
     };
-  } catch (e) {
+  } catch (_) {
     return { qtyPrecision: 3, pricePrecision: 2, minQty: 0.001, minNotional: 5 };
   }
 }
