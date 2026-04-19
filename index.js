@@ -131,6 +131,13 @@ async function startup() {
       const history = loadTradeHistory();
       return generateLessonsFromTrades(history.filter(t => t.closedAt));
     },
+    onClosePosition: async (symbol, posAmt) => {
+      const positions = await syncPositions();
+      const pos = positions.find(p => p.symbol === symbol);
+      if (!pos) throw new Error(`Posisi ${symbol} tidak ditemukan`);
+      await closePositionWithReason(pos, 'manual_close_dashboard');
+      await syncPositions();
+    },
   };
 
   registerTelegramHandlers(handlers);
@@ -215,6 +222,23 @@ async function runManageCycle() {
   try {
     const positions = await syncPositions();
     bumpCycle('manage');
+
+    // Auto-evolve jika sudah cukup real trades
+    const evSummary = getEvolveSummary();
+    if (evSummary.canEvolve) {
+      const history = loadTradeHistory();
+      const realClosed = history.filter(t => t.closedAt && !t.isPaper);
+      // Evolve setiap kelipatan evolveMinTrades baru
+      const threshold = config.evolveMinTrades || 5;
+      if (realClosed.length > 0 && realClosed.length % threshold === 0) {
+        logger.ai(MOD, `Auto-evolve triggered (${realClosed.length} real closed trades)...`);
+        evolveThresholds().then(result => {
+          if (result?.changes && Object.keys(result.changes).length > 0) {
+            send(`⚙️ *Auto-Evolve*: parameter diperbarui dari ${realClosed.length} trades`);
+          }
+        }).catch(() => {});
+      }
+    }
 
     if (!positions.length) {
       logger.info(MOD, 'Tidak ada posisi terbuka');
