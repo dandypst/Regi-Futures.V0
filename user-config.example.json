@@ -1,13 +1,14 @@
 {
   "mode": "testnet",
   "dryRun": true,
-  "pairs": [
-    "BTCUSDT",
-    "ETHUSDT",
-    "BNBUSDT",
-    "SOLUSDT",
-    "XRPUSDT"
-  ],
+
+  "autoPairs": true,
+  "autoPairsQuote": "USDT",
+  "autoPairsPerpOnly": true,
+  "pairsBlacklist": ["BTCDOMUSDT", "DEFIUSDT", "ALTUSDT"],
+
+  "pairs": ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT"],
+
   "leverage": 5,
   "maxPositions": 3,
   "riskPerTrade": 0.02,
@@ -18,5 +19,8 @@
   "screeningIntervalMin": 30,
   "evolveMinTrades": 5,
   "openRouterModel": "anthropic/claude-3-haiku",
-  "dashboardPort": 3000
+  "dashboardPort": 3000,
+
+  "ollamaMode": false,
+  "ollamaBaseUrl": "http://localhost:11434"
 }
