@@ -787,6 +787,139 @@ header::after {
   }
   .btn-settings:hover { border-color: var(--accent); color: var(--accent); }
 
+
+  /* DRY RUN badge */
+  .dryrun-banner {
+    background: repeating-linear-gradient(
+      45deg,
+      rgba(255,204,0,.06),
+      rgba(255,204,0,.06) 10px,
+      transparent 10px,
+      transparent 20px
+    );
+    border: 1px solid rgba(255,204,0,.3);
+    border-radius: 4px;
+    padding: 8px 16px;
+    display: flex; align-items: center; gap: 10px;
+    font-family: var(--mono); font-size: 10px; color: var(--yellow);
+    letter-spacing: 1px;
+    margin-bottom: 14px;
+    animation: borderPulse 3s ease-in-out infinite;
+  }
+  .dryrun-banner.hidden { display: none; }
+  .dryrun-icon { font-size: 14px; }
+
+  /* Trade action buttons on positions */
+  .pos-actions { display: flex; gap: 6px; align-items: center; }
+  .btn-close-pos {
+    padding: 4px 10px;
+    background: rgba(255,45,85,.12);
+    border: 1px solid rgba(255,45,85,.3);
+    border-radius: 3px;
+    color: var(--red);
+    font-family: var(--mono); font-size: 9px;
+    letter-spacing: 1px; cursor: pointer;
+    transition: all .2s; text-transform: uppercase;
+  }
+  .btn-close-pos:hover { background: rgba(255,45,85,.25); }
+
+  /* Trade notification popup */
+  .trade-popup {
+    position: fixed; bottom: 80px; right: 24px;
+    background: var(--panel);
+    border-radius: 6px;
+    padding: 14px 18px;
+    max-width: 320px; z-index: 500;
+    transform: translateX(120%);
+    transition: transform .4s cubic-bezier(.175,.885,.32,1.275);
+    box-shadow: 0 8px 40px rgba(0,0,0,.5);
+  }
+  .trade-popup.show { transform: translateX(0); }
+  .trade-popup.long-open  { border-left: 3px solid var(--green); }
+  .trade-popup.short-open { border-left: 3px solid var(--red); }
+  .trade-popup.closed     { border-left: 3px solid var(--accent2); }
+
+  .tp-title { font-family: var(--head); font-size: 12px; font-weight: 700; margin-bottom: 6px; }
+  .tp-row   { display:flex; justify-content:space-between; font-family:var(--mono); font-size:10px; color:var(--text2); margin-bottom:3px; }
+  .tp-row span:last-child { color: var(--text); }
+
+  /* Status bar below metrics */
+  .status-bar {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 14px;
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 4px; margin-bottom: 14px;
+    font-family: var(--mono); font-size: 10px;
+    flex-wrap: wrap;
+  }
+  .status-item { display:flex; align-items:center; gap:6px; color: var(--text3); }
+  .status-item span { color: var(--text2); }
+  .status-sep { color: var(--border2); }
+
+
+  /* DRY RUN badge */
+  .dryrun-badge {
+    display: flex; align-items: center; gap: 6px;
+    padding: 5px 12px;
+    background: rgba(255,204,0,.1);
+    border: 1px solid rgba(255,204,0,.3);
+    border-radius: 4px;
+    font-family: var(--mono); font-size: 9px; letter-spacing: 2px;
+    color: var(--yellow); text-transform: uppercase;
+    animation: blink 2s infinite;
+  }
+  .dryrun-badge.live-mode {
+    background: rgba(255,45,85,.1);
+    border-color: rgba(255,45,85,.3);
+    color: var(--red);
+    animation: none;
+  }
+
+  /* Trade notification popup */
+  .trade-popup {
+    position: fixed; top: 80px; right: 24px;
+    min-width: 280px; max-width: 340px;
+    background: var(--panel);
+    border-radius: 6px;
+    padding: 14px 16px;
+    z-index: 500;
+    transform: translateX(120%);
+    transition: transform .35s cubic-bezier(.175,.885,.32,1.275);
+    box-shadow: 0 8px 40px rgba(0,0,0,.5);
+  }
+  .trade-popup.show { transform: translateX(0); }
+  .trade-popup.open-trade  { border: 1px solid rgba(0,255,170,.4); border-left: 3px solid var(--green); }
+  .trade-popup.close-trade { border: 1px solid rgba(255,45,85,.4);  border-left: 3px solid var(--red); }
+  .trade-popup.paper-trade { border: 1px solid rgba(255,204,0,.4);  border-left: 3px solid var(--yellow); }
+
+  .tp-title { font-family: var(--head); font-size: 12px; font-weight: 700; margin-bottom: 6px; }
+  .tp-title.open  { color: var(--green); }
+  .tp-title.close { color: var(--red); }
+  .tp-title.paper { color: var(--yellow); }
+
+  .tp-body { font-family: var(--mono); font-size: 10px; color: var(--text2); line-height: 1.8; }
+  .tp-body span { color: var(--accent); }
+
+  /* Positions panel with close button */
+  .pos-close-btn {
+    background: rgba(255,45,85,.15);
+    border: 1px solid rgba(255,45,85,.3);
+    border-radius: 3px; padding: 3px 8px;
+    color: var(--red); font-family: var(--mono); font-size: 9px;
+    cursor: pointer; letter-spacing: 1px; transition: all .2s;
+  }
+  .pos-close-btn:hover { background: rgba(255,45,85,.3); }
+
+  /* Mode indicator in metrics */
+  .mode-indicator {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 8px; border-radius: 2px;
+    font-family: var(--mono); font-size: 9px; letter-spacing: 1px;
+  }
+  .mode-indicator.dry  { background: rgba(255,204,0,.1); color: var(--yellow); border: 1px solid rgba(255,204,0,.2); }
+  .mode-indicator.live { background: rgba(255,45,85,.1);  color: var(--red);    border: 1px solid rgba(255,45,85,.2); }
+  .mode-indicator.test { background: rgba(108,60,255,.1); color: var(--accent2); border: 1px solid rgba(108,60,255,.2); }
+
 </style>
 </head>
 <body>
@@ -806,6 +939,10 @@ header::after {
     <div class="hpill">
       <div class="hdot" id="wsDot"></div>
       <span id="wsStatus">CONNECTING</span>
+    </div>
+
+    <div id="dryrunBadge" class="dryrun-badge" title="Mode simulasi — order tidak dikirim ke Binance">
+      ◉ DRY RUN
     </div>
 
     <div class="hpill" id="proxyPill" title="Proxy status">
@@ -872,6 +1009,29 @@ header::after {
     <div class="metric-value" id="metPairs">0</div>
     <div class="metric-sub" id="metCycles">0 cycles</div>
   </div>
+</div>
+
+<!-- DRY RUN banner -->
+<div class="dryrun-banner hidden" id="dryRunBanner">
+  <span class="dryrun-icon">⚠</span>
+  <span><strong>DRY RUN MODE</strong> — Order disimulasikan, tidak dikirim ke Binance. Set <code>DRY_RUN=false</code> di .env untuk trading sungguhan di testnet.</span>
+</div>
+
+<!-- Status bar -->
+<div class="status-bar" id="statusBar">
+  <div class="status-item">Mode: <span id="sbMode">—</span></div>
+  <div class="status-sep">|</div>
+  <div class="status-item">DryRun: <span id="sbDryRun" style="color:var(--yellow)">—</span></div>
+  <div class="status-sep">|</div>
+  <div class="status-item">Agent: <span id="sbAgent">—</span></div>
+  <div class="status-sep">|</div>
+  <div class="status-item">Pairs: <span id="sbPairs">—</span></div>
+  <div class="status-sep">|</div>
+  <div class="status-item">Last Trade: <span id="sbLastTrade">—</span></div>
+  <div class="status-sep">|</div>
+  <div class="status-item">Manage: <span id="sbManageInt">—</span></div>
+  <div class="status-sep">|</div>
+  <div class="status-item">Screen: <span id="sbScreenInt">—</span></div>
 </div>
 
 <!-- ═══ RADAR (full width) ═══ -->
@@ -944,8 +1104,11 @@ header::after {
   <!-- CENTER -->
   <div class="col-center">
     <div class="panel">
-      <div class="panel-title">Open Positions</div>
-      <div id="positionsList" class="scroll-panel" style="max-height:200px">
+      <div class="panel-title">
+        <span>Open Positions</span>
+        <span id="modeIndicator" class="mode-indicator dry">DRY RUN</span>
+      </div>
+      <div id="positionsList" class="scroll-panel" style="max-height:220px">
         <div class="empty"><div class="empty-icon">📭</div>No open positions</div>
       </div>
     </div>
@@ -1135,7 +1298,20 @@ header::after {
   </div>
 </div>
 
+
+<!-- Trade notification popup -->
+<div class="trade-popup" id="tradePopup">
+  <div class="tp-title" id="tpTitle">Trade Opened</div>
+  <div class="tp-body" id="tpBody"></div>
+</div>
+
 </div><!-- /app -->
+
+<!-- Trade notification popup -->
+<div class="trade-popup" id="tradePopup">
+  <div class="tp-title">TRADE</div>
+  <div class="tp-body" style="font-family:var(--mono);font-size:10px;color:var(--text2);line-height:1.6"></div>
+</div>
 
 <div id="toast"></div>
 
@@ -1175,12 +1351,16 @@ function connectWS() {
     if (msg.type === 'state') updateState(msg.data);
     if (msg.type === 'log') {
       appendLog(msg.data.level, msg.data.module, msg.data.msg);
+      if (msg.data.level === 'TRADE') handleTradeLog(msg.data.msg || '');
       if (msg.data.level === 'AI' && msg.data.msg?.includes('Radar')) {
         loadRadar();
         lastScreenTs = Date.now();
       }
       if (msg.data.level === 'SYS' && msg.data.msg?.includes('Screening cycle')) {
         lastScreenTs = Date.now();
+      }
+      if (msg.data.level === 'TRADE') {
+        showTradePopup(msg.data);
       }
     }
   };
@@ -1259,22 +1439,99 @@ function updateState(state) {
   document.getElementById('evWR').textContent  = (ev.winRate||'0') + '%';
   document.getElementById('evAvg').textContent = ev.avgPnl || '0.00';
 
-  renderPositions(state.openPositions||[]);
+  renderPositionsWithClose(state.openPositions||[], state.config?.dryRun);
+  updateModeIndicator(state.config);
+  updateStatusBar(state);
+  updateDryRunBanner(state);
   updateTicker(state.config?.pairs||[]);
 }
 
 function renderPositions(positions) {
   const el = document.getElementById('positionsList');
-  if (!positions.length) { el.innerHTML = '<div class="empty"><div class="empty-icon">📭</div>No open positions</div>'; return; }
+  if (!positions.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">📭</div>No open positions</div>';
+    return;
+  }
   el.innerHTML = positions.map(p => {
-    const side = parseFloat(p.positionAmt) > 0 ? 'LONG' : 'SHORT';
-    const pnl  = parseFloat(p.unRealizedProfit||0);
-    return `<div class="pos-card">
-      <div><div class="pos-sym">${p.symbol}</div><div class="pos-entry">Entry: ${parseFloat(p.entryPrice).toFixed(2)}</div></div>
-      <span class="pos-side ${side.toLowerCase()}">${side}</span>
-      <div><div class="pos-pnl ${pnl>=0?'pos':'neg'}">${pnl>=0?'+':''}${pnl.toFixed(2)}</div><div style="font-family:var(--mono);font-size:9px;color:var(--text3);text-align:right">USDT</div></div>
+    const side   = parseFloat(p.positionAmt) > 0 ? 'LONG' : 'SHORT';
+    const pnl    = parseFloat(p.unRealizedProfit||0);
+    const qty    = Math.abs(parseFloat(p.positionAmt||0));
+    const entry  = parseFloat(p.entryPrice||0);
+    const mark   = parseFloat(p.markPrice||0);
+    const liq    = parseFloat(p.liquidationPrice||0);
+    const pnlPct = (qty > 0 && entry > 0) ? ((pnl / (qty * entry)) * 100) : 0;
+    return `<div class="pos-card" style="flex-direction:column;gap:10px;align-items:stretch">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <div class="pos-sym">${p.symbol}</div>
+          <div class="pos-entry">Qty: ${qty} | Entry: ${entry.toFixed(2)}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="pos-side ${side.toLowerCase()}">${side}</span>
+          <button class="btn-close-pos" onclick="closePosition('${p.symbol}','${p.positionAmt}')">CLOSE</button>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
+        <div>
+          <div style="font-family:var(--mono);font-size:8px;color:var(--text3)">UNREALIZED PnL</div>
+          <div class="pos-pnl ${pnl>=0?'pos':'neg'}" style="font-size:14px">${pnl>=0?'+':''}${pnl.toFixed(2)}</div>
+          <div style="font-family:var(--mono);font-size:9px;color:${pnlPct>=0?'var(--green)':'var(--red)'}">${pnlPct>=0?'+':''}${pnlPct.toFixed(2)}%</div>
+        </div>
+        <div>
+          <div style="font-family:var(--mono);font-size:8px;color:var(--text3)">MARK PRICE</div>
+          <div style="font-family:var(--head);font-size:13px;color:var(--text)">${mark.toFixed(2)}</div>
+        </div>
+        <div>
+          <div style="font-family:var(--mono);font-size:8px;color:var(--text3)">LIQ PRICE</div>
+          <div style="font-family:var(--head);font-size:13px;color:var(--red)">${liq > 0 ? liq.toFixed(2) : '—'}</div>
+        </div>
+      </div>
     </div>`;
   }).join('');
+}
+
+function updateDryRunBanner(state) {
+  const isDryRun = state.dryRun === true ||
+    (state.config && state.config.dryRun === true);
+  const banner = document.getElementById('dryRunBanner');
+  if (banner) banner.classList.toggle('hidden', !isDryRun);
+}
+
+function updateStatusBar(state) {
+  const cfg = state.config || {};
+  const m   = state.metrics || {};
+
+  const sbMode = document.getElementById('sbMode');
+  if (sbMode) {
+    sbMode.textContent = (state.mode||'—').toUpperCase();
+    sbMode.style.color = state.mode === 'live' ? 'var(--yellow)' : 'var(--accent)';
+  }
+
+  const sbDry = document.getElementById('sbDryRun');
+  if (sbDry) {
+    const isDry = state.dryRun === true || cfg.dryRun === true;
+    sbDry.textContent = isDry ? 'ON (simulasi)' : 'OFF (live order)';
+    sbDry.style.color = isDry ? 'var(--yellow)' : 'var(--green)';
+  }
+
+  const sbAgent = document.getElementById('sbAgent');
+  if (sbAgent) {
+    sbAgent.textContent = state.running ? 'RUNNING' : 'STOPPED';
+    sbAgent.style.color = state.running ? 'var(--green)' : 'var(--red)';
+  }
+
+  setText('sbPairs',     (cfg.pairs||[]).length + ' pairs');
+  setText('sbManageInt', (cfg.managementIntervalMin||'—') + ' min');
+  setText('sbScreenInt', (cfg.screeningIntervalMin||'—') + ' min');
+
+  // Last trade from history
+  const lastTrade = window._lastTradeTs;
+  setText('sbLastTrade', lastTrade ? new Date(lastTrade).toLocaleTimeString() : '—');
+}
+
+function setText(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = val;
 }
 
 function updateTicker(pairs) {
@@ -1503,6 +1760,149 @@ function toast(msg, type='') {
 
 
 
+
+// ── Trade notification popup ──────────────────────────────────────────────────
+
+let popupTimer = null;
+
+function showTradePopup(type, data) {
+  const popup = document.getElementById('tradePopup');
+  const title = document.getElementById('tpTitle');
+  const body  = document.getElementById('tpBody');
+
+  popup.className = 'trade-popup show ' + type;
+
+  if (type === 'open-trade') {
+    title.className = 'tp-title open';
+    title.textContent = '▲ POSITION OPENED';
+    body.innerHTML = `
+      <div>Symbol: <span>${data.symbol}</span></div>
+      <div>Side: <span style="color:${data.side==='LONG'?'var(--green)':'var(--red)'}">${data.side}</span></div>
+      <div>Entry: <span>${data.entry}</span></div>
+      <div>TP: <span style="color:var(--green)">${data.tp}</span> | SL: <span style="color:var(--red)">${data.sl}</span></div>
+    `;
+  } else if (type === 'close-trade') {
+    const pos = parseFloat(data.pnl || 0) >= 0;
+    title.className = 'tp-title close';
+    title.textContent = '▼ POSITION CLOSED';
+    body.innerHTML = `
+      <div>Symbol: <span>${data.symbol}</span></div>
+      <div>Reason: <span>${data.reason}</span></div>
+      <div>PnL: <span style="color:${pos?'var(--green)':'var(--red)'}">${pos?'+':''}${parseFloat(data.pnl||0).toFixed(2)} USDT</span></div>
+    `;
+  } else if (type === 'paper-trade') {
+    title.className = 'tp-title paper';
+    title.textContent = '📝 PAPER SIGNAL';
+    body.innerHTML = `
+      <div>Symbol: <span>${data.symbol}</span></div>
+      <div>Side: <span style="color:${data.side==='LONG'?'var(--green)':'var(--red)'}">${data.side}</span></div>
+      <div>Confidence: <span>${data.confidence}%</span></div>
+      <div style="color:var(--yellow);font-size:9px;margin-top:4px">DRY RUN — tidak dikirim ke Binance</div>
+    `;
+  }
+
+  clearTimeout(popupTimer);
+  popupTimer = setTimeout(() => { popup.className = 'trade-popup'; }, 6000);
+}
+
+// Intercept TRADE log entries for popup
+function handleTradeLog(msg) {
+  if (msg.includes('Opening') || msg.includes('Dibuka')) {
+    const match = msg.match(/([A-Z]+USDT)[\s\S]*?(LONG|SHORT)/);
+    if (match) showTradePopup('open-trade', { symbol: match[1], side: match[2], entry:'—', tp:'—', sl:'—' });
+  }
+  if (msg.includes('closed') || msg.includes('Closed')) {
+    const match = msg.match(/([A-Z]+USDT)[\s\S]*?PnL[:\s]+([\d.\-+]+)/);
+    if (match) showTradePopup('close-trade', { symbol: match[1], pnl: match[2], reason:'—' });
+  }
+  if (msg.includes('[PAPER]')) {
+    const match = msg.match(/(LONG|SHORT)\s+([A-Z]+USDT)/);
+    if (match) showTradePopup('paper-trade', { side: match[1], symbol: match[2], confidence:'—' });
+  }
+}
+
+// ── DRY RUN / mode indicator ──────────────────────────────────────────────────
+
+function updateModeIndicator(cfg) {
+  if (!cfg) return;
+  const dryEl  = document.getElementById('dryrunBadge');
+  const modeEl = document.getElementById('modeIndicator');
+
+  const isDry  = cfg.dryRun;
+  const mode   = cfg.mode || 'testnet';
+
+  // Header badge
+  if (dryEl) {
+    if (isDry) {
+      dryEl.style.display = 'flex';
+      dryEl.className     = 'dryrun-badge';
+      dryEl.title         = 'DRY RUN — Order simulasi lokal, tidak dikirim ke Binance';
+      dryEl.innerHTML     = '◉ DRY RUN';
+    } else {
+      dryEl.style.display = 'flex';
+      dryEl.className     = 'dryrun-badge live-mode';
+      dryEl.title         = `LIVE — Order dikirim ke Binance ${mode.toUpperCase()}`;
+      dryEl.innerHTML     = `◉ ${mode.toUpperCase()} LIVE`;
+    }
+  }
+
+  // Positions panel indicator
+  if (modeEl) {
+    if (isDry) {
+      modeEl.className = 'mode-indicator dry';
+      modeEl.textContent = 'DRY RUN';
+    } else if (mode === 'testnet') {
+      modeEl.className = 'mode-indicator test';
+      modeEl.textContent = 'TESTNET';
+    } else {
+      modeEl.className = 'mode-indicator live';
+      modeEl.textContent = 'LIVE ⚠';
+    }
+  }
+}
+
+// ── Positions dengan close button ─────────────────────────────────────────────
+
+function renderPositionsWithClose(positions, isDry) {
+  const el = document.getElementById('positionsList');
+  if (!positions.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">📭</div>No open positions</div>';
+    return;
+  }
+  el.innerHTML = positions.map(p => {
+    const side = parseFloat(p.positionAmt) > 0 ? 'LONG' : 'SHORT';
+    const pnl  = parseFloat(p.unRealizedProfit || 0);
+    const liq  = p.liquidationPrice ? `Liq: ${parseFloat(p.liquidationPrice).toFixed(2)}` : '';
+    return `<div class="pos-card">
+      <div style="flex:1">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="pos-sym">${p.symbol}</div>
+          <span class="pos-side ${side.toLowerCase()}">${side}</span>
+        </div>
+        <div class="pos-entry">Entry: ${parseFloat(p.entryPrice||0).toFixed(2)} | ${liq}</div>
+      </div>
+      <div style="text-align:right">
+        <div class="pos-pnl ${pnl>=0?'pos':'neg'}">${pnl>=0?'+':''}${pnl.toFixed(2)}</div>
+        <div style="font-family:var(--mono);font-size:9px;color:var(--text3)">USDT</div>
+        ${!isDry ? `<button class="pos-close-btn" onclick="closePositionManual('${p.symbol}','${p.positionAmt}')">CLOSE</button>` : '<div style="font-family:var(--mono);font-size:8px;color:var(--text3);margin-top:4px">PAPER</div>'}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function closePositionManual(symbol, posAmt) {
+  if (!confirm(`Close ${symbol} position?`)) return;
+  try {
+    const r = await fetch(`${API}/api/close-position`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ symbol, posAmt }),
+    });
+    const d = await r.json();
+    d.ok ? toast(`${symbol} closed`, 'success') : toast(d.error, 'error');
+  } catch { toast('Connection error', 'error'); }
+}
+
 // ── Settings ──────────────────────────────────────────────────────────────────
 
 let _settingsCache = {};
@@ -1657,6 +2057,48 @@ document.addEventListener('keydown', e => {
 });
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
+// Close position manually from dashboard
+async function closePosition(symbol, positionAmt) {
+  if (!confirm(`Close ${symbol} position (${positionAmt})?`)) return;
+  try {
+    const r = await fetch(`${API}/api/close`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ symbol, positionAmt }),
+    });
+    const d = await r.json();
+    d.ok ? toast(`${symbol} closed`, 'success') : toast(d.error||'Failed', 'error');
+  } catch { toast('Connection error', 'error'); }
+}
+
+// Trade popup notification
+let _tradePopupTimer;
+window._lastTradeTs = null;
+
+function showTradePopup(entry) {
+  window._lastTradeTs = Date.now();
+  const msg  = entry.msg || '';
+  const isOpen  = msg.toLowerCase().includes('open') || msg.toLowerCase().includes('dibuka');
+  const isClose = msg.toLowerCase().includes('close') || msg.toLowerCase().includes('closed');
+  if (!isOpen && !isClose) return;
+
+  // Parse symbol from message
+  const symMatch = msg.match(/`([A-Z]+USDT)`/);
+  const sym = symMatch ? symMatch[1] : '';
+
+  const popup = document.getElementById('tradePopup');
+  if (!popup) return;
+
+  popup.querySelector('.tp-title').textContent = isOpen ? `🟢 POSITION OPENED` : `🔴 POSITION CLOSED`;
+  popup.querySelector('.tp-body').textContent  = msg.replace(/`/g,'');
+  popup.className = 'trade-popup show ' + (isClose ? 'closed' : (msg.includes('LONG') ? 'long-open' : 'short-open'));
+
+  clearTimeout(_tradePopupTimer);
+  _tradePopupTimer = setTimeout(() => {
+    popup.classList.remove('show');
+  }, 6000);
+}
+
 fetch(`${API}/api/state`).then(r=>r.json()).then(updateState).catch(()=>{});
 loadRadar();
 connectWS();
