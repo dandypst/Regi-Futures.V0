@@ -867,12 +867,21 @@ header::after {
     font-family: var(--mono); font-size: 9px; letter-spacing: 2px;
     color: var(--yellow); text-transform: uppercase;
     animation: blink 2s infinite;
+    cursor: pointer; transition: all .2s;
+  }
+  .dryrun-badge:hover {
+    background: rgba(255,204,0,.2);
+    box-shadow: 0 0 12px rgba(255,204,0,.2);
   }
   .dryrun-badge.live-mode {
     background: rgba(255,45,85,.1);
     border-color: rgba(255,45,85,.3);
     color: var(--red);
     animation: none;
+  }
+  .dryrun-badge.live-mode:hover {
+    background: rgba(255,45,85,.2);
+    box-shadow: 0 0 12px rgba(255,45,85,.2);
   }
 
   /* Trade notification popup */
@@ -941,9 +950,9 @@ header::after {
       <span id="wsStatus">CONNECTING</span>
     </div>
 
-    <div id="dryrunBadge" class="dryrun-badge" title="Mode simulasi — order tidak dikirim ke Binance">
+    <button id="dryrunBadge" class="dryrun-badge" onclick="toggleDryRun()" title="Klik untuk matikan/hidupkan Dry Run">
       ◉ DRY RUN
-    </div>
+    </button>
 
     <div class="hpill" id="proxyPill" title="Proxy status">
       <div class="hdot dim" id="proxyDot"></div>
@@ -1830,18 +1839,19 @@ function updateModeIndicator(cfg) {
 
   const isDry  = cfg.dryRun;
   const mode   = cfg.mode || 'testnet';
+  _currentDryRun = isDry; // sync state lokal
 
   // Header badge
   if (dryEl) {
     if (isDry) {
       dryEl.style.display = 'flex';
       dryEl.className     = 'dryrun-badge';
-      dryEl.title         = 'DRY RUN — Order simulasi lokal, tidak dikirim ke Binance';
+      dryEl.title         = 'DRY RUN aktif — Klik untuk matikan (order ke Binance)';
       dryEl.innerHTML     = '◉ DRY RUN';
     } else {
       dryEl.style.display = 'flex';
       dryEl.className     = 'dryrun-badge live-mode';
-      dryEl.title         = `LIVE — Order dikirim ke Binance ${mode.toUpperCase()}`;
+      dryEl.title         = `Order NYATA ke Binance ${mode.toUpperCase()} — Klik untuk aktifkan Dry Run`;
       dryEl.innerHTML     = `◉ ${mode.toUpperCase()} LIVE`;
     }
   }
@@ -1901,6 +1911,45 @@ async function closePositionManual(symbol, posAmt) {
     const d = await r.json();
     d.ok ? toast(`${symbol} closed`, 'success') : toast(d.error, 'error');
   } catch { toast('Connection error', 'error'); }
+}
+
+
+// ── Dry Run Toggle ────────────────────────────────────────────────────────────
+
+let _currentDryRun = true; // cache state lokal
+
+async function toggleDryRun() {
+  const newVal = !_currentDryRun;
+
+  // Konfirmasi jika mau matikan dry run (artinya order nyata)
+  if (!newVal) {
+    const mode = currentMode || 'testnet';
+    const msg  = mode === 'live'
+      ? '⚠ MATIKAN DRY RUN di mode LIVE?\n\nOrder NYATA akan dikirim ke Binance dengan uang asli!'
+      : '⚠ Matikan Dry Run di mode TESTNET?\n\nOrder nyata akan dikirim ke testnet Binance (token testnet).';
+    if (!confirm(msg)) return;
+  }
+
+  try {
+    const r = await fetch(`${API}/api/settings`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ dryRun: newVal }),
+    });
+    const d = await r.json();
+
+    if (d.ok) {
+      _currentDryRun = newVal;
+      toast(
+        newVal ? '✓ Dry Run AKTIF — simulasi lokal' : '✓ Dry Run NONAKTIF — order ke Binance',
+        newVal ? 'warn' : 'error'
+      );
+    } else {
+      toast('Gagal: ' + (d.errors?.join(', ') || d.error), 'error');
+    }
+  } catch (e) {
+    toast('Connection error: ' + e.message, 'error');
+  }
 }
 
 // ── Settings ──────────────────────────────────────────────────────────────────
