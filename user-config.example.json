@@ -1,0 +1,22 @@
+{
+  "mode": "testnet",
+  "dryRun": true,
+  "pairs": [
+    "BTCUSDT",
+    "ETHUSDT",
+    "BNBUSDT",
+    "SOLUSDT",
+    "XRPUSDT"
+  ],
+  "leverage": 5,
+  "maxPositions": 3,
+  "riskPerTrade": 0.02,
+  "takeProfitPct": 0.03,
+  "stopLossPct": 0.015,
+  "trailingStop": false,
+  "managementIntervalMin": 10,
+  "screeningIntervalMin": 30,
+  "evolveMinTrades": 5,
+  "openRouterModel": "anthropic/claude-3-haiku",
+  "dashboardPort": 3000
+}
