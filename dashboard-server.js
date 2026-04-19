@@ -12,6 +12,7 @@ import { config } from './config.js';
 import { getLessons } from './lessons.js';
 import { getAllMemory } from './pool-memory.js';
 import { getEvolveSummary, loadTradeHistory } from './evolve.js';
+import { getProxyStatus } from './binance.js';
 import { onLog, logger } from './logger.js'; // FIX: single import line
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -73,6 +74,7 @@ function getFullState() {
     evolve:       getEvolveSummary(),
     lessonsCount: getLessons().length,
     memoryPairs:  Object.keys(getAllMemory()).length,
+    proxy:        getProxyStatus(),
   };
 }
 
