@@ -260,6 +260,7 @@ app.post('/api/settings', (req, res) => {
   }
 
   // Boolean
+  if (body.dryRun       !== undefined) updates.dryRun       = body.dryRun       === true || body.dryRun       === 'true';
   if (body.trailingStop !== undefined) updates.trailingStop = body.trailingStop === true || body.trailingStop === 'true';
   if (body.autoPairs    !== undefined) updates.autoPairs    = body.autoPairs    === true || body.autoPairs    === 'true';
   if (body.ollamaMode   !== undefined) updates.ollamaMode   = body.ollamaMode   === true || body.ollamaMode   === 'true';
