@@ -4,7 +4,7 @@
 
 import axios from 'axios';
 import { createHmac } from 'crypto';
-import { getBinanceConfig } from './config.js';
+import { config, getBinanceConfig } from './config.js';
 import { logger } from './logger.js';
 
 const MOD = 'BINANCE';
@@ -302,7 +302,7 @@ export async function setMarginType(symbol, marginType = 'ISOLATED') {
 }
 
 export async function placeOrder(params) {
-  if (process.env.DRY_RUN === 'true') {
+  if (process.env.DRY_RUN === 'true' || config.dryRun === true) {
     logger.trade(MOD, `[DRY-RUN] Simulated order`, params);
     return {
       orderId:  `DRY_${Date.now()}`,
