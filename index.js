@@ -1,4 +1,4 @@
-// index.js — Main orchestrator for RRL-Futures
+// index.js — Main orchestrator untuk RRL-Futures
 // Entry point: node index.js
 
 import { mkdirSync } from 'fs';
@@ -12,7 +12,7 @@ import { runScreeningAgent, runManagementAgent } from './agent.js';
 import { openPosition, closePositionWithReason, syncPositions } from './executor.js';
 import { initTelegram, registerTelegramHandlers, send, sendCycleReport } from './telegram.js';
 import { initDashboard } from './dashboard-server.js';
-import { checkConnectivity, getBalance } from './binance.js';
+import { checkConnectivity, getBalance, getAllFuturesPairs } from './binance.js';
 
 mkdirSync('./data', { recursive: true });
 mkdirSync('./logs', { recursive: true });
@@ -21,6 +21,49 @@ const MOD = 'INDEX';
 let managementTimer = null;
 let screeningTimer  = null;
 let running = false;
+
+// ── Auto-load pairs dari Binance ──────────────────────────────────────────────
+
+async function loadPairs() {
+  // Jika user set autoPairs: true di user-config.json → fetch semua pair dari Binance
+  // Jika autoPairs: false atau tidak ada → pakai pairs dari user-config.json
+  if (!config.autoPairs) {
+    const pairs = config.pairs?.length ? config.pairs : ['BTCUSDT', 'ETHUSDT'];
+    logger.info(MOD, `Pairs dari config: ${pairs.length} pairs`);
+    return pairs;
+  }
+
+  try {
+    logger.info(MOD, 'autoPairs aktif — fetching semua pair USD-M Futures dari Binance...');
+
+    const allPairs = await getAllFuturesPairs({
+      quoteAsset: config.autoPairsQuote || 'USDT',
+      perpOnly:   config.autoPairsPerpOnly !== false, // default true
+    });
+
+    if (!allPairs.length) {
+      logger.warn(MOD, 'Gagal fetch pairs dari Binance — pakai pairs dari config');
+      return config.pairs?.length ? config.pairs : ['BTCUSDT', 'ETHUSDT'];
+    }
+
+    // Filter opsional: blacklist pair tertentu
+    const blacklist = config.pairsBlacklist || [];
+    const filtered  = blacklist.length
+      ? allPairs.filter(p => !blacklist.includes(p))
+      : allPairs;
+
+    // Update config.pairs supaya agent.js, dashboard, dan modul lain bisa akses
+    config.pairs = filtered;
+
+    logger.sys(MOD, `autoPairs: ${filtered.length} pairs aktif${blacklist.length ? ` (${blacklist.length} diblacklist)` : ''}`);
+    send(`📋 autoPairs: ${filtered.length} pairs USD-M Futures dimuat`);
+
+    return filtered;
+  } catch (e) {
+    logger.error(MOD, `loadPairs gagal: ${e.message} — pakai pairs dari config`);
+    return config.pairs?.length ? config.pairs : ['BTCUSDT', 'ETHUSDT'];
+  }
+}
 
 // ── Startup ───────────────────────────────────────────────────────────────────
 
@@ -37,14 +80,13 @@ async function startup() {
   const dryRun = process.env.DRY_RUN === 'true' || config.dryRun;
   logger.sys(MOD, `Mode: ${config.mode} | DryRun: ${dryRun}`);
 
-  if (!process.env.BINANCE_API_KEY || process.env.BINANCE_API_KEY.startsWith('GANTI_')) {
-    logger.warn(MOD, 'BINANCE_API_KEY belum diset di .env');
+  if (!process.env.BINANCE_TESTNET_API_KEY && !process.env.BINANCE_API_KEY) {
+    logger.warn(MOD, 'BINANCE API KEY belum diset di .env');
   }
   if (!config.openRouterApiKey || config.openRouterApiKey.startsWith('GANTI_')) {
     logger.warn(MOD, 'OPENROUTER_API_KEY belum diset — agent akan pakai rule-based fallback');
   }
 
-  // FIX: define handlers once, share between Telegram and Dashboard
   const handlers = {
     onStart:      (mode) => startAgent(mode),
     onStop:       ()     => stopAgent(),
@@ -65,6 +107,7 @@ async function startup() {
     logger.warn(MOD, 'Binance connectivity gagal — cek API key dan jaringan');
   }
 
+  // Fetch balance
   try {
     const balances = await getBalance();
     const usdt = balances.find(b => b.asset === 'USDT');
@@ -76,14 +119,17 @@ async function startup() {
     logger.warn(MOD, `Gagal fetch balance awal: ${e.message}`);
   }
 
+  // Load pairs (auto dari Binance atau dari config)
+  await loadPairs();
+
   logger.sys(MOD, `Dashboard → http://localhost:${config.dashboardPort || 3000}`);
+  logger.sys(MOD, `Pairs aktif: ${config.pairs?.length || 0}`);
   logger.sys(MOD, `Evolve: ${JSON.stringify(getEvolveSummary())}`);
   logger.sys(MOD, 'Siap. Gunakan dashboard atau Telegram untuk memulai agent.');
 }
 
 // ── Agent start / stop ────────────────────────────────────────────────────────
 
-// FIX: removed export — these functions are called only via handlers (no circular export needed)
 async function startAgent(mode) {
   if (running) {
     logger.warn(MOD, 'Agent sudah berjalan');
@@ -95,10 +141,12 @@ async function startAgent(mode) {
   running = true;
   setRunning(true, targetMode);
 
-  logger.sys(MOD, `▶ Agent dimulai — mode: ${targetMode}`);
-  send(`▶️ *RRL-Futures dimulai* dalam mode \`${targetMode}\``);
+  // Refresh pairs saat start (bisa saja ada pair baru/dihapus)
+  await loadPairs();
 
-  // Run first cycles immediately
+  logger.sys(MOD, `▶ Agent dimulai — mode: ${targetMode} | ${config.pairs?.length} pairs`);
+  send(`▶️ *RRL-Futures dimulai* dalam mode \`${targetMode}\` | ${config.pairs?.length} pairs`);
+
   await runManageCycle();
   await runScreenCycle();
 
@@ -127,12 +175,11 @@ function stopAgent() {
 }
 
 function changeMode(mode) {
-  // FIX: only set config.mode once, pass it directly to startAgent
   const wasRunning = running;
   if (wasRunning) stopAgent();
   logger.sys(MOD, `Mode diubah → ${mode}`);
   send(`🔄 Mode diubah ke \`${mode}\``);
-  if (wasRunning) startAgent(mode); // startAgent sets config.mode internally
+  if (wasRunning) startAgent(mode);
   else config.mode = mode;
 }
 
@@ -185,9 +232,12 @@ async function runScreenCycle() {
     }
 
     bumpCycle('screen');
-    const pairs = config.pairs?.length ? config.pairs : ['BTCUSDT', 'ETHUSDT'];
-    const decision = await runScreeningAgent(pairs);
 
+    // Pakai config.pairs yang sudah di-load (auto atau manual)
+    const pairs = config.pairs?.length ? config.pairs : ['BTCUSDT', 'ETHUSDT'];
+    logger.info(MOD, `Screening dari ${pairs.length} pairs...`);
+
+    const decision = await runScreeningAgent(pairs);
     logger.ai(MOD, `Screening: ${decision.action} ${decision.pair || ''} confidence=${decision.confidence}%`);
 
     if (decision.action === 'OPEN' && (decision.confidence || 0) >= 60) {
