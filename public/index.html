@@ -1,0 +1,1207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RRL-Futures — AI Trading Agent</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #080c12;
+    --bg2: #0d1219;
+    --bg3: #111820;
+    --panel: #0f1822;
+    --border: #1a2535;
+    --border2: #243044;
+    --accent: #00e5ff;
+    --accent2: #7b5cff;
+    --green: #00ff9d;
+    --red: #ff3d6e;
+    --yellow: #ffd166;
+    --text: #e8f0fe;
+    --text2: #7a95b5;
+    --text3: #3d5570;
+    --mono: 'Space Mono', monospace;
+    --sans: 'DM Sans', sans-serif;
+    --radius: 8px;
+    --glow: 0 0 20px rgba(0,229,255,0.15);
+    --glow-green: 0 0 20px rgba(0,255,157,0.2);
+    --glow-red: 0 0 20px rgba(255,61,110,0.2);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Background grid */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Scanline effect */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg, transparent, transparent 2px,
+      rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px
+    );
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  #app {
+    position: relative;
+    z-index: 1;
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 0 20px 40px;
+  }
+
+  /* ── Header ── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 0 24px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 24px;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .logo-icon {
+    width: 40px; height: 40px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+  }
+
+  .logo-text {
+    font-family: var(--mono);
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 4px;
+    text-shadow: 0 0 30px rgba(0,229,255,0.5);
+  }
+
+  .logo-sub {
+    font-size: 11px;
+    color: var(--text3);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-top: 2px;
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .status-pill {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-radius: 100px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 1px;
+  }
+
+  .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--text3);
+    transition: all 0.3s;
+  }
+
+  .status-dot.running {
+    background: var(--green);
+    box-shadow: 0 0 8px var(--green);
+    animation: pulse 2s infinite;
+  }
+
+  .status-dot.stopped { background: var(--red); }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.6; transform: scale(0.8); }
+  }
+
+  /* ── Mode toggle ── */
+  .mode-toggle {
+    display: flex;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .mode-btn {
+    padding: 8px 18px;
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 1px;
+    background: none;
+    border: none;
+    color: var(--text3);
+    cursor: pointer;
+    transition: all 0.2s;
+    text-transform: uppercase;
+  }
+
+  .mode-btn.active-testnet {
+    background: rgba(123,92,255,0.2);
+    color: var(--accent2);
+    box-shadow: inset 0 0 20px rgba(123,92,255,0.1);
+  }
+
+  .mode-btn.active-live {
+    background: rgba(255,209,102,0.15);
+    color: var(--yellow);
+    box-shadow: inset 0 0 20px rgba(255,209,102,0.1);
+  }
+
+  /* ── Grid layout ── */
+  .grid {
+    display: grid;
+    grid-template-columns: 280px 1fr 340px;
+    grid-template-rows: auto auto 1fr;
+    gap: 16px;
+  }
+
+  @media (max-width: 1200px) {
+    .grid { grid-template-columns: 1fr 1fr; }
+    .col-left { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+    .col-right { grid-column: 1 / -1; }
+  }
+
+  /* ── Panel base ── */
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    transition: border-color 0.3s;
+  }
+
+  .panel:hover { border-color: var(--border2); }
+
+  .panel-title {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--text3);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .panel-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* ── Metric cards ── */
+  .metrics-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 16px;
+    grid-column: 1 / -1;
+  }
+
+  .metric {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 20px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .metric::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--accent);
+    opacity: 0.4;
+  }
+
+  .metric.green::before { background: var(--green); }
+  .metric.red::before { background: var(--red); }
+  .metric.purple::before { background: var(--accent2); }
+
+  .metric-label {
+    font-size: 11px;
+    color: var(--text3);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    font-family: var(--mono);
+  }
+
+  .metric-value {
+    font-family: var(--mono);
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1;
+  }
+
+  .metric-value.pos { color: var(--green); }
+  .metric-value.neg { color: var(--red); }
+  .metric-sub { font-size: 12px; color: var(--text3); margin-top: 4px; }
+
+  /* ── Left column ── */
+  .col-left {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  /* ── Control panel ── */
+  .controls {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .btn {
+    padding: 12px 20px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    transition: all 0.2s;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .btn-start {
+    background: linear-gradient(135deg, #00b96b, #00ff9d);
+    color: #001a0d;
+    box-shadow: 0 4px 20px rgba(0,255,157,0.3);
+  }
+
+  .btn-start:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 30px rgba(0,255,157,0.4);
+  }
+
+  .btn-stop {
+    background: linear-gradient(135deg, #c0203e, #ff3d6e);
+    color: white;
+    box-shadow: 0 4px 20px rgba(255,61,110,0.3);
+  }
+
+  .btn-stop:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 30px rgba(255,61,110,0.4);
+  }
+
+  .btn-secondary {
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    color: var(--text2);
+  }
+
+  .btn-secondary:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(0,229,255,0.05);
+  }
+
+  .btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none !important;
+  }
+
+  /* ── Positions ── */
+  .position-card {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    transition: border-color 0.2s;
+  }
+
+  .position-card:hover { border-color: var(--border2); }
+
+  .pos-symbol {
+    font-family: var(--mono);
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  .pos-side {
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-family: var(--mono);
+    letter-spacing: 1px;
+  }
+
+  .pos-side.long {
+    background: rgba(0,255,157,0.15);
+    color: var(--green);
+    border: 1px solid rgba(0,255,157,0.3);
+  }
+
+  .pos-side.short {
+    background: rgba(255,61,110,0.15);
+    color: var(--red);
+    border: 1px solid rgba(255,61,110,0.3);
+  }
+
+  .pos-pnl {
+    font-family: var(--mono);
+    font-size: 15px;
+    font-weight: 700;
+    text-align: right;
+  }
+
+  .pos-pnl.pos { color: var(--green); }
+  .pos-pnl.neg { color: var(--red); }
+
+  /* ── Log terminal ── */
+  .log-terminal {
+    background: #060a0f;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    height: 340px;
+    overflow-y: auto;
+    font-family: var(--mono);
+    font-size: 11px;
+    line-height: 1.7;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border2) transparent;
+  }
+
+  .log-terminal::-webkit-scrollbar { width: 4px; }
+  .log-terminal::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+
+  .log-entry { display: flex; gap: 10px; animation: fadeIn 0.3s ease; }
+
+  @keyframes fadeIn { from { opacity: 0; transform: translateX(-4px); } to { opacity: 1; } }
+
+  .log-ts { color: var(--text3); white-space: nowrap; }
+  .log-level { width: 50px; flex-shrink: 0; text-align: center; padding: 0 4px; border-radius: 3px; }
+  .log-level.INFO  { color: var(--accent); }
+  .log-level.TRADE { color: var(--green); background: rgba(0,255,157,0.1); }
+  .log-level.WARN  { color: var(--yellow); }
+  .log-level.ERROR { color: var(--red); background: rgba(255,61,110,0.1); }
+  .log-level.AI    { color: var(--accent2); }
+  .log-level.SYS   { color: var(--text2); }
+  .log-mod  { color: var(--text3); font-size: 10px; }
+  .log-msg  { color: var(--text2); word-break: break-all; }
+
+  /* ── Lessons / Memory tabs ── */
+  .tabs {
+    display: flex;
+    gap: 2px;
+    margin-bottom: 16px;
+    background: var(--bg3);
+    border-radius: 8px;
+    padding: 4px;
+  }
+
+  .tab {
+    flex: 1;
+    padding: 7px;
+    background: none;
+    border: none;
+    border-radius: 6px;
+    color: var(--text3);
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .tab.active {
+    background: var(--panel);
+    color: var(--accent);
+    border: 1px solid var(--border2);
+  }
+
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* ── Lessons list ── */
+  .lesson-item {
+    padding: 10px 12px;
+    border-radius: 6px;
+    background: var(--bg3);
+    border-left: 2px solid var(--accent2);
+    margin-bottom: 8px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--text2);
+  }
+
+  .lesson-meta {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+    margin-bottom: 4px;
+  }
+
+  /* ── Memory table ── */
+  .memory-table { width: 100%; border-collapse: collapse; }
+  .memory-table th {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 1px;
+    color: var(--text3);
+    text-align: left;
+    padding: 0 8px 8px;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .memory-table td {
+    padding: 8px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text2);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .score-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .score-track {
+    flex: 1;
+    height: 4px;
+    background: var(--bg3);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .score-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.5s ease;
+  }
+
+  /* ── Config panel ── */
+  .config-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  .config-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .config-label {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 1px;
+    color: var(--text3);
+    text-transform: uppercase;
+  }
+
+  .config-val {
+    font-family: var(--mono);
+    font-size: 14px;
+    color: var(--accent);
+  }
+
+  /* ── Toast ── */
+  #toast {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    padding: 12px 20px;
+    background: var(--panel);
+    border: 1px solid var(--border2);
+    border-radius: 8px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text);
+    z-index: 1000;
+    transform: translateY(100px);
+    opacity: 0;
+    transition: all 0.3s;
+    max-width: 320px;
+  }
+
+  #toast.show { transform: translateY(0); opacity: 1; }
+  #toast.success { border-color: var(--green); color: var(--green); }
+  #toast.error { border-color: var(--red); color: var(--red); }
+
+  /* ── Scroll ── */
+  .scroll-panel { max-height: 280px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--border2) transparent; }
+  .scroll-panel::-webkit-scrollbar { width: 4px; }
+  .scroll-panel::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+
+  /* ── Connection indicator ── */
+  .ws-indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+  }
+
+  .ws-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--text3);
+    transition: all 0.3s;
+  }
+
+  .ws-dot.connected { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .ws-dot.disconnected { background: var(--red); }
+
+  /* ── Divider ── */
+  .divider { height: 1px; background: var(--border); margin: 12px 0; }
+
+  /* ── Empty state ── */
+  .empty {
+    text-align: center;
+    padding: 30px;
+    color: var(--text3);
+    font-size: 12px;
+    font-family: var(--mono);
+  }
+
+  .empty-icon { font-size: 28px; margin-bottom: 8px; opacity: 0.4; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- Header -->
+  <header>
+    <div class="logo">
+      <div class="logo-icon">⚡</div>
+      <div>
+        <div class="logo-text">RRL-FUTURES</div>
+        <div class="logo-sub">AI Trading Agent</div>
+      </div>
+    </div>
+
+    <div class="header-right">
+      <div class="ws-indicator">
+        <div class="ws-dot" id="wsDot"></div>
+        <span id="wsStatus">connecting</span>
+      </div>
+
+      <div class="mode-toggle">
+        <button class="mode-btn" id="btnTestnet" onclick="setMode('testnet')">TESTNET</button>
+        <button class="mode-btn" id="btnLive" onclick="setMode('live')">⚠ LIVE</button>
+      </div>
+
+      <div class="status-pill">
+        <div class="status-dot" id="agentDot"></div>
+        <span id="agentStatus">OFFLINE</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Metrics row -->
+  <div class="metrics-row">
+    <div class="metric green">
+      <div class="metric-label">Balance (USDT)</div>
+      <div class="metric-value pos" id="metBalance">—</div>
+      <div class="metric-sub">Available</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Open Positions</div>
+      <div class="metric-value" id="metPositions">0</div>
+      <div class="metric-sub" id="metMaxPos">/ — max</div>
+    </div>
+    <div class="metric green">
+      <div class="metric-label">Win Rate</div>
+      <div class="metric-value" id="metWinRate">0%</div>
+      <div class="metric-sub" id="metTrades">0 trades</div>
+    </div>
+    <div class="metric purple">
+      <div class="metric-label">Total PnL</div>
+      <div class="metric-value" id="metPnl">0.00</div>
+      <div class="metric-sub" id="metTodayPnl">Today: 0.00</div>
+    </div>
+  </div>
+
+  <!-- Main grid -->
+  <div class="grid">
+
+    <!-- LEFT: controls + config -->
+    <div class="col-left">
+
+      <!-- Controls -->
+      <div class="panel">
+        <div class="panel-title">Controls</div>
+        <div class="controls">
+          <button class="btn btn-start" id="btnStart" onclick="startAgent()">
+            ▶ Start Agent
+          </button>
+          <button class="btn btn-stop" id="btnStop" onclick="stopAgent()" disabled>
+            ■ Stop Agent
+          </button>
+          <div class="divider"></div>
+          <button class="btn btn-secondary" onclick="runEvolve()">
+            ⚙ Evolve Thresholds
+          </button>
+          <button class="btn btn-secondary" onclick="runLearn()">
+            📚 Generate Lessons
+          </button>
+        </div>
+      </div>
+
+      <!-- Config display -->
+      <div class="panel">
+        <div class="panel-title">Parameters</div>
+        <div class="config-grid" id="configGrid">
+          <div class="config-item">
+            <div class="config-label">Leverage</div>
+            <div class="config-val" id="cfgLeverage">—</div>
+          </div>
+          <div class="config-item">
+            <div class="config-label">Risk/Trade</div>
+            <div class="config-val" id="cfgRisk">—</div>
+          </div>
+          <div class="config-item">
+            <div class="config-label">Take Profit</div>
+            <div class="config-val" id="cfgTP">—</div>
+          </div>
+          <div class="config-item">
+            <div class="config-label">Stop Loss</div>
+            <div class="config-val" id="cfgSL">—</div>
+          </div>
+          <div class="config-item">
+            <div class="config-label">Max Positions</div>
+            <div class="config-val" id="cfgMaxPos">—</div>
+          </div>
+          <div class="config-item">
+            <div class="config-label">Cycles</div>
+            <div class="config-val" id="cfgCycles">—</div>
+          </div>
+        </div>
+        <div class="divider"></div>
+        <div class="config-item" style="margin-top:4px">
+          <div class="config-label">Active Pairs</div>
+          <div class="config-val" id="cfgPairs" style="font-size:11px; word-break:break-all">—</div>
+        </div>
+      </div>
+
+      <!-- Evolve summary -->
+      <div class="panel">
+        <div class="panel-title">Evolve Status</div>
+        <div id="evolveSummary" class="config-grid">
+          <div class="config-item">
+            <div class="config-label">Closed Trades</div>
+            <div class="config-val" id="evolveClosed">0</div>
+          </div>
+          <div class="config-item">
+            <div class="config-label">Can Evolve</div>
+            <div class="config-val" id="evolveReady">No</div>
+          </div>
+          <div class="config-item">
+            <div class="config-label">Win Rate</div>
+            <div class="config-val" id="evolveWR">0%</div>
+          </div>
+          <div class="config-item">
+            <div class="config-label">Avg PnL</div>
+            <div class="config-val" id="evolveAvgPnl">0</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- CENTER: positions + log -->
+    <div style="display:flex;flex-direction:column;gap:16px;">
+
+      <!-- Positions -->
+      <div class="panel">
+        <div class="panel-title">Open Positions</div>
+        <div id="positionsList" class="scroll-panel">
+          <div class="empty">
+            <div class="empty-icon">📭</div>
+            No open positions
+          </div>
+        </div>
+      </div>
+
+      <!-- Log terminal -->
+      <div class="panel" style="flex:1">
+        <div class="panel-title" style="justify-content:space-between">
+          <span>Live Log</span>
+          <button onclick="clearLog()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:11px;font-family:var(--mono)">CLEAR</button>
+        </div>
+        <div class="log-terminal" id="logTerminal">
+          <div class="log-entry">
+            <span class="log-level SYS">SYS</span>
+            <span class="log-msg">Waiting for agent connection...</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- RIGHT: lessons + memory -->
+    <div class="col-right" style="display:flex;flex-direction:column;gap:16px;">
+
+      <!-- Lessons / Memory tabs -->
+      <div class="panel" style="flex:1">
+        <div class="tabs">
+          <button class="tab active" id="tabLessons" onclick="switchTab('lessons')">Lessons</button>
+          <button class="tab" id="tabMemory" onclick="switchTab('memory')">Pair Memory</button>
+          <button class="tab" id="tabHistory" onclick="switchTab('history')">History</button>
+        </div>
+
+        <!-- Lessons tab -->
+        <div id="contentLessons" class="tab-content active scroll-panel" style="max-height:400px">
+          <div class="empty" id="lessonsEmpty">
+            <div class="empty-icon">📚</div>
+            No lessons yet
+          </div>
+          <div id="lessonsList"></div>
+        </div>
+
+        <!-- Memory tab -->
+        <div id="contentMemory" class="tab-content scroll-panel" style="max-height:400px">
+          <table class="memory-table" id="memoryTable">
+            <thead>
+              <tr>
+                <th>Pair</th>
+                <th>Score</th>
+                <th>WR%</th>
+                <th>Trades</th>
+              </tr>
+            </thead>
+            <tbody id="memoryBody"></tbody>
+          </table>
+          <div class="empty" id="memoryEmpty" style="display:none">
+            <div class="empty-icon">🧠</div>
+            No memory yet
+          </div>
+        </div>
+
+        <!-- History tab -->
+        <div id="contentHistory" class="tab-content scroll-panel" style="max-height:400px">
+          <div id="historyList">
+            <div class="empty">
+              <div class="empty-icon">📊</div>
+              No trade history yet
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Last cycle info -->
+      <div class="panel">
+        <div class="panel-title">Agent Cycles</div>
+        <div class="config-grid">
+          <div class="config-item">
+            <div class="config-label">Last Manage</div>
+            <div class="config-val" id="lastManage" style="font-size:11px">—</div>
+          </div>
+          <div class="config-item">
+            <div class="config-label">Last Screen</div>
+            <div class="config-val" id="lastScreen" style="font-size:11px">—</div>
+          </div>
+          <div class="config-item">
+            <div class="config-label">Lessons</div>
+            <div class="config-val" id="lessonsCount">0</div>
+          </div>
+          <div class="config-item">
+            <div class="config-label">Memory Pairs</div>
+            <div class="config-val" id="memoryPairs">0</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script>
+const API = window.location.origin;
+let ws = null;
+let currentMode = 'testnet';
+let isRunning = false;
+const MAX_LOGS = 200;
+let logCount = 0;
+
+// ── WebSocket ─────────────────────────────────────────────────────────────────
+
+function connectWS() {
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  ws = new WebSocket(`${proto}//${location.host}`);
+
+  ws.onopen = () => {
+    setWsStatus(true);
+    appendLog('SYS', 'DASHBOARD', 'WebSocket connected');
+  };
+
+  ws.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+    if (msg.type === 'state') updateState(msg.data);
+    if (msg.type === 'log') appendLog(msg.data.level, msg.data.module, msg.data.msg);
+  };
+
+  ws.onclose = () => {
+    setWsStatus(false);
+    setTimeout(connectWS, 3000);
+  };
+
+  ws.onerror = () => ws.close();
+}
+
+function setWsStatus(connected) {
+  document.getElementById('wsDot').className = 'ws-dot ' + (connected ? 'connected' : 'disconnected');
+  document.getElementById('wsStatus').textContent = connected ? 'connected' : 'reconnecting';
+}
+
+// ── State renderer ────────────────────────────────────────────────────────────
+
+function updateState(state) {
+  if (!state) return;
+
+  isRunning = state.running;
+  currentMode = state.mode || 'testnet';
+
+  // Agent status
+  const dot = document.getElementById('agentDot');
+  const statusEl = document.getElementById('agentStatus');
+  dot.className = 'status-dot ' + (isRunning ? 'running' : 'stopped');
+  statusEl.textContent = isRunning ? 'RUNNING' : 'OFFLINE';
+
+  // Mode buttons
+  document.getElementById('btnTestnet').className = 'mode-btn ' + (currentMode === 'testnet' ? 'active-testnet' : '');
+  document.getElementById('btnLive').className = 'mode-btn ' + (currentMode === 'live' ? 'active-live' : '');
+
+  // Control buttons
+  document.getElementById('btnStart').disabled = isRunning;
+  document.getElementById('btnStop').disabled = !isRunning;
+
+  // Balance
+  const bal = state.balance?.USDT || '—';
+  document.getElementById('metBalance').textContent = bal !== '—' ? parseFloat(bal).toFixed(2) : '—';
+
+  // Positions
+  document.getElementById('metPositions').textContent = (state.openPositions || []).length;
+  document.getElementById('metMaxPos').textContent = `/ ${state.config?.maxPositions || '?'} max`;
+  renderPositions(state.openPositions || []);
+
+  // Metrics
+  const m = state.metrics || {};
+  const wr = parseFloat(m.winRate || 0);
+  document.getElementById('metWinRate').textContent = wr.toFixed(1) + '%';
+  document.getElementById('metWinRate').className = 'metric-value ' + (wr >= 50 ? 'pos' : 'neg');
+  document.getElementById('metTrades').textContent = `${m.totalTrades || 0} trades`;
+
+  const pnl = parseFloat(m.totalPnl || 0);
+  const pnlEl = document.getElementById('metPnl');
+  pnlEl.textContent = pnl.toFixed(2);
+  pnlEl.className = 'metric-value ' + (pnl >= 0 ? 'pos' : 'neg');
+  const todayPnl = parseFloat(m.todayPnl || 0);
+  document.getElementById('metTodayPnl').textContent = `Today: ${todayPnl >= 0 ? '+' : ''}${todayPnl.toFixed(2)}`;
+
+  // Config
+  const cfg = state.config || {};
+  document.getElementById('cfgLeverage').textContent = `${cfg.leverage || '?'}x`;
+  document.getElementById('cfgRisk').textContent = cfg.riskPerTrade ? `${(cfg.riskPerTrade * 100).toFixed(1)}%` : '—';
+  document.getElementById('cfgTP').textContent = cfg.takeProfitPct ? `${(cfg.takeProfitPct * 100).toFixed(1)}%` : '—';
+  document.getElementById('cfgSL').textContent = cfg.stopLossPct ? `${(cfg.stopLossPct * 100).toFixed(1)}%` : '—';
+  document.getElementById('cfgMaxPos').textContent = cfg.maxPositions || '—';
+  document.getElementById('cfgCycles').textContent = state.cycles || 0;
+  document.getElementById('cfgPairs').textContent = (cfg.pairs || []).join(', ') || '—';
+
+  // Cycles
+  const fmt = ts => ts ? new Date(ts).toLocaleTimeString() : '—';
+  document.getElementById('lastManage').textContent = fmt(state.lastManageCycle);
+  document.getElementById('lastScreen').textContent = fmt(state.lastScreenCycle);
+  document.getElementById('lessonsCount').textContent = state.lessonsCount || 0;
+  document.getElementById('memoryPairs').textContent = state.memoryPairs || 0;
+
+  // Evolve
+  const ev = state.evolve || {};
+  document.getElementById('evolveClosed').textContent = ev.totalClosed || 0;
+  document.getElementById('evolveReady').textContent = ev.canEvolve ? '✅ Yes' : 'No';
+  document.getElementById('evolveReady').style.color = ev.canEvolve ? 'var(--green)' : 'var(--text3)';
+  document.getElementById('evolveWR').textContent = (ev.winRate || '0') + '%';
+  document.getElementById('evolveAvgPnl').textContent = ev.avgPnl || '0.00';
+}
+
+function renderPositions(positions) {
+  const el = document.getElementById('positionsList');
+  if (!positions.length) {
+    el.innerHTML = `<div class="empty"><div class="empty-icon">📭</div>No open positions</div>`;
+    return;
+  }
+  el.innerHTML = positions.map(p => {
+    const side = parseFloat(p.positionAmt) > 0 ? 'LONG' : 'SHORT';
+    const pnl = parseFloat(p.unRealizedProfit || 0);
+    const posClass = pnl >= 0 ? 'pos' : 'neg';
+    return `<div class="position-card">
+      <div>
+        <div class="pos-symbol">${p.symbol}</div>
+        <div style="font-family:var(--mono);font-size:11px;color:var(--text3);margin-top:3px">
+          Entry: ${parseFloat(p.entryPrice).toFixed(2)}
+        </div>
+      </div>
+      <div>
+        <span class="pos-side ${side.toLowerCase()}">${side}</span>
+      </div>
+      <div>
+        <div class="pos-pnl ${posClass}">${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}</div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--text3);text-align:right">USDT</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── Log terminal ──────────────────────────────────────────────────────────────
+
+function appendLog(level, mod, msg) {
+  const terminal = document.getElementById('logTerminal');
+  const now = new Date().toLocaleTimeString();
+  const div = document.createElement('div');
+  div.className = 'log-entry';
+  div.innerHTML = `<span class="log-ts">${now}</span><span class="log-level ${level}">${level}</span><span class="log-mod">[${mod}]</span><span class="log-msg">${escHtml(msg)}</span>`;
+  terminal.appendChild(div);
+  logCount++;
+  // Remove old entries if over limit
+  if (logCount > MAX_LOGS) {
+    terminal.firstChild && terminal.removeChild(terminal.firstChild);
+  }
+  terminal.scrollTop = terminal.scrollHeight;
+}
+
+function clearLog() {
+  document.getElementById('logTerminal').innerHTML = '';
+  logCount = 0;
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── Actions ───────────────────────────────────────────────────────────────────
+
+async function startAgent() {
+  try {
+    const r = await fetch(`${API}/api/start`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ mode: currentMode })
+    });
+    const d = await r.json();
+    if (d.ok) toast('Agent started in ' + currentMode + ' mode', 'success');
+    else toast(d.error, 'error');
+  } catch (e) { toast('Connection error', 'error'); }
+}
+
+async function stopAgent() {
+  try {
+    const r = await fetch(`${API}/api/stop`, { method: 'POST' });
+    const d = await r.json();
+    if (d.ok) toast('Agent stopped', 'success');
+    else toast(d.error, 'error');
+  } catch (e) { toast('Connection error', 'error'); }
+}
+
+async function setMode(mode) {
+  if (mode === 'live') {
+    if (!confirm('⚠️ Switch to LIVE mode? Real money will be traded!')) return;
+  }
+  try {
+    const r = await fetch(`${API}/api/mode`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ mode })
+    });
+    const d = await r.json();
+    if (d.ok) toast('Mode changed to ' + mode, 'success');
+    else toast(d.error || 'Failed', 'error');
+  } catch (e) { toast('Connection error', 'error'); }
+}
+
+async function runEvolve() {
+  toast('Running threshold evolution...', '');
+  try {
+    const r = await fetch(`${API}/api/evolve`, { method: 'POST' });
+    const d = await r.json();
+    if (d.ok) toast('Evolution complete!', 'success');
+    else toast(d.error || 'Failed', 'error');
+  } catch (e) { toast('Connection error', 'error'); }
+}
+
+async function runLearn() {
+  toast('Generating lessons from trade history...', '');
+  try {
+    const r = await fetch(`${API}/api/learn`, { method: 'POST' });
+    const d = await r.json();
+    if (d.ok) toast(`Generated ${d.count || 0} lessons!`, 'success');
+    else toast(d.error || 'Failed', 'error');
+  } catch (e) { toast('Connection error', 'error'); }
+}
+
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+
+async function switchTab(tab) {
+  ['lessons','memory','history'].forEach(t => {
+    document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1)).className = 'tab' + (t === tab ? ' active' : '');
+    document.getElementById('content' + t.charAt(0).toUpperCase() + t.slice(1)).className = 'tab-content' + (t === tab ? ' active' : '') + ' scroll-panel';
+    document.getElementById('content' + t.charAt(0).toUpperCase() + t.slice(1)).style.maxHeight = '400px';
+  });
+
+  if (tab === 'lessons') loadLessons();
+  if (tab === 'memory') loadMemory();
+  if (tab === 'history') loadHistory();
+}
+
+async function loadLessons() {
+  try {
+    const r = await fetch(`${API}/api/lessons`);
+    const lessons = await r.json();
+    const list = document.getElementById('lessonsList');
+    const empty = document.getElementById('lessonsEmpty');
+    if (!lessons.length) { empty.style.display = ''; list.innerHTML = ''; return; }
+    empty.style.display = 'none';
+    list.innerHTML = lessons.slice().reverse().map(l =>
+      `<div class="lesson-item">
+        <div class="lesson-meta">[${l.pair || 'GENERAL'}] [${l.direction || 'ANY'}] ${l.confidence || 'medium'}</div>
+        ${escHtml(l.insight)}
+      </div>`
+    ).join('');
+  } catch (_) {}
+}
+
+async function loadMemory() {
+  try {
+    const r = await fetch(`${API}/api/memory`);
+    const mem = await r.json();
+    const pairs = Object.values(mem);
+    const tbody = document.getElementById('memoryBody');
+    const empty = document.getElementById('memoryEmpty');
+    if (!pairs.length) { empty.style.display = ''; tbody.innerHTML = ''; return; }
+    empty.style.display = 'none';
+    const sorted = pairs.sort((a,b) => (b.score||50)-(a.score||50));
+    tbody.innerHTML = sorted.map(p => {
+      const score = p.score || 50;
+      const color = score > 60 ? 'var(--green)' : score < 40 ? 'var(--red)' : 'var(--yellow)';
+      return `<tr>
+        <td style="color:var(--accent);font-weight:700">${p.symbol}</td>
+        <td>
+          <div class="score-bar">
+            <span style="color:${color};font-size:12px">${score.toFixed(0)}</span>
+            <div class="score-track">
+              <div class="score-fill" style="width:${score}%;background:${color}"></div>
+            </div>
+          </div>
+        </td>
+        <td style="color:${parseFloat(p.winRate||0)>=50?'var(--green)':'var(--red)'}">${(p.winRate||0).toFixed(0)}%</td>
+        <td>${p.totalTrades||0}</td>
+      </tr>`;
+    }).join('');
+  } catch (_) {}
+}
+
+async function loadHistory() {
+  try {
+    const r = await fetch(`${API}/api/history`);
+    const history = await r.json();
+    const el = document.getElementById('historyList');
+    if (!history.length) {
+      el.innerHTML = `<div class="empty"><div class="empty-icon">📊</div>No trade history yet</div>`;
+      return;
+    }
+    el.innerHTML = history.slice().reverse().map(t => {
+      const pnl = parseFloat(t.pnl || 0);
+      const pos = pnl >= 0;
+      return `<div style="padding:10px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-family:var(--mono);font-size:13px;color:var(--text)">${t.symbol} <span style="color:${t.side==='LONG'?'var(--green)':'var(--red)'};font-size:11px">${t.side}</span></div>
+          <div style="font-size:11px;color:var(--text3);margin-top:2px">${t.closeReason || ''} · ${t.closedAt ? new Date(t.closedAt).toLocaleDateString() : ''}</div>
+        </div>
+        <div style="font-family:var(--mono);font-size:14px;color:${pos?'var(--green)':'var(--red)'};font-weight:700">${pos?'+':''}${pnl.toFixed(2)}</div>
+      </div>`;
+    }).join('');
+  } catch (_) {}
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+
+let toastTimer = null;
+function toast(msg, type) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'show ' + (type || '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.className = '', 3000);
+}
+
+// ── Initial load ──────────────────────────────────────────────────────────────
+
+fetch(`${API}/api/state`).then(r => r.json()).then(updateState).catch(() => {});
+connectWS();
+
+// Periodic refresh for lessons count
+setInterval(() => {
+  const active = document.querySelector('.tab.active')?.id;
+  if (active === 'tabMemory') loadMemory();
+  if (active === 'tabLessons') loadLessons();
+  if (active === 'tabHistory') loadHistory();
+}, 30000);
+</script>
+</body>
+</html>
