@@ -13,6 +13,7 @@ import { getLessons } from './lessons.js';
 import { getAllMemory } from './pool-memory.js';
 import { getEvolveSummary, loadTradeHistory } from './evolve.js';
 import { getRadarData } from './agent.js';
+import { closePositionWithReason } from './executor.js';
 import { getProxyStatus } from './binance.js';
 import { onLog, logger } from './logger.js'; // FIX: single import line
 
@@ -63,6 +64,7 @@ function getFullState() {
     ...state,
     config: {
       mode:                   config.mode,
+      dryRun:                 process.env.DRY_RUN === 'true' || !!config.dryRun,
       pairs:                  config.pairs,
       leverage:               config.leverage,
       riskPerTrade:           config.riskPerTrade,
@@ -83,6 +85,7 @@ function getFullState() {
     lessonsCount: getLessons().length,
     memoryPairs:  Object.keys(getAllMemory()).length,
     proxy:        getProxyStatus(),
+    dryRun:       process.env.DRY_RUN === 'true' || config.dryRun === true,
   };
 }
 
@@ -180,6 +183,28 @@ app.get('/api/history', (_req, res) => {
   res.json(loadTradeHistory().slice(-50));
 });
 
+// Manual close position dari dashboard
+app.post('/api/close', async (req, res) => {
+  const { symbol, positionAmt } = req.body;
+  if (!symbol || positionAmt === undefined) {
+    return res.status(400).json({ ok: false, error: 'symbol dan positionAmt wajib diisi' });
+  }
+  try {
+    // Build position object minimal yang dibutuhkan closePositionWithReason
+    const { getPositions } = await import('./binance.js');
+    const positions = await getPositions();
+    const pos = positions.find(p => p.symbol === symbol);
+    if (!pos) return res.status(404).json({ ok: false, error: `Posisi ${symbol} tidak ditemukan` });
+
+    await closePositionWithReason(pos, 'manual close dari dashboard');
+    broadcast({ type: 'state', data: getFullState() });
+    logger.sys(MOD, `Manual close: ${symbol}`);
+    res.json({ ok: true, symbol });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
 app.get('/api/radar', (_req, res) => {
   res.json(getRadarData());
 });
@@ -264,6 +289,20 @@ app.post('/api/settings', (req, res) => {
     logger.sys(MOD, `Settings updated: ${JSON.stringify(updates)}`);
     broadcast({ type: 'state', data: getFullState() });
     res.json({ ok: true, updated: updates });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// Manual close position dari dashboard
+app.post('/api/close-position', async (req, res) => {
+  const { symbol, posAmt } = req.body;
+  if (!symbol || !posAmt) return res.status(400).json({ error: 'symbol dan posAmt diperlukan' });
+  if (!_handlers.onClosePosition) return res.status(500).json({ error: 'Handler tidak terdaftar' });
+  try {
+    await _handlers.onClosePosition(symbol, posAmt);
+    broadcast({ type: 'state', data: getFullState() });
+    res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ ok: false, error: e.message });
   }
