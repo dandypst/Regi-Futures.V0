@@ -18,6 +18,12 @@ import {
 
 const MOD = 'AGENT';
 
+// ── Radar data — pairs dengan sinyal kuat, diupdate setiap screening cycle ────
+// Disimpan di memori, dibaca oleh dashboard-server.js via getRadarData()
+let _radarData = [];
+
+export function getRadarData() { return [..._radarData]; }
+
 // ═══════════════════════════════════════════════════════════
 //  TECHNICAL INDICATORS
 // ═══════════════════════════════════════════════════════════
@@ -546,6 +552,61 @@ export async function runScreeningAgent(pairs) {
 
   const state      = getState();
   const lessonsCtx = getLessonsContext();
+
+  // ── Hitung radar score untuk semua pair valid ──────────────────────────
+  _radarData = valid
+    .map(d => {
+      const rsi       = parseFloat(d.rsi1h || 50);
+      const ichiBull  = (d.ichi_bull_signals || 0) >= 3;
+      const ichiBear  = (d.ichi_bear_signals || 0) >= 3;
+      const macdBull  = d.macd1h_bull || parseFloat(d.macd1h_hist || 0) > 0;
+      const macdBear  = d.macd1h_bear || parseFloat(d.macd1h_hist || 0) < 0;
+      const bullCandle = ['HAMMER','BULL_ENGULFING','MORNING_STAR','BULL_MARUBOZU'].includes(d.candle_1h);
+      const bearCandle = ['SHOOTING_STAR','BEAR_ENGULFING','EVENING_STAR','BEAR_MARUBOZU'].includes(d.candle_1h);
+
+      const longSignals = [
+        { name: 'Uptrend 4h',      hit: d.regime4h === 'UPTREND' },
+        { name: 'RSI Oversold',    hit: rsi < 45 && rsi > 20 },
+        { name: 'Ichimoku Bull',   hit: ichiBull },
+        { name: 'MACD Bull',       hit: macdBull },
+        { name: 'Candle/Volume',   hit: bullCandle || !!d.vol_spike },
+        { name: 'Above Cloud',     hit: !!d.ichi_above_cloud },
+      ];
+
+      const shortSignals = [
+        { name: 'Downtrend 4h',    hit: d.regime4h === 'DOWNTREND' },
+        { name: 'RSI Overbought',  hit: rsi > 55 && rsi < 80 },
+        { name: 'Ichimoku Bear',   hit: ichiBear },
+        { name: 'MACD Bear',       hit: macdBear },
+        { name: 'Candle/Volume',   hit: bearCandle || !!d.vol_spike },
+        { name: 'Below Cloud',     hit: !!d.ichi_below_cloud },
+      ];
+
+      const longScore  = longSignals.filter(s => s.hit).length;
+      const shortScore = shortSignals.filter(s => s.hit).length;
+      const bestScore  = Math.max(longScore, shortScore);
+      const bestSide   = longScore >= shortScore ? 'LONG' : 'SHORT';
+      const bestSigs   = bestSide === 'LONG' ? longSignals : shortSignals;
+
+      return {
+        symbol:      d.symbol,
+        price:       d.price,
+        side:        bestSide,
+        score:       bestScore,
+        signals:     bestSigs,
+        longScore,
+        shortScore,
+        rsi1h:       d.rsi1h,
+        regime4h:    d.regime4h,
+        fundingRate: d.fundingRate,
+        change24h:   d.change24h,
+        updatedAt:   new Date().toISOString(),
+      };
+    })
+    .filter(d => d.score >= 4)               // hanya yang 4+ sinyal
+    .sort((a, b) => b.score - a.score);      // urutkan dari skor tertinggi
+
+  logger.ai(MOD, `Radar: ${_radarData.length} pairs dengan ≥4/6 sinyal`);
 
   const marketSummary = valid.map(d => {
     const lines = [
