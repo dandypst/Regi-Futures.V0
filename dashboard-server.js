@@ -8,7 +8,7 @@ import cors from 'cors';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { getState } from './state.js';
-import { config } from './config.js';
+import { config, saveUserConfig } from './config.js';
 import { getLessons } from './lessons.js';
 import { getAllMemory } from './pool-memory.js';
 import { getEvolveSummary, loadTradeHistory } from './evolve.js';
@@ -68,9 +68,16 @@ function getFullState() {
       riskPerTrade:           config.riskPerTrade,
       takeProfitPct:          config.takeProfitPct,
       stopLossPct:            config.stopLossPct,
+      trailingStop:           config.trailingStop,
       maxPositions:           config.maxPositions,
       managementIntervalMin:  config.managementIntervalMin,
       screeningIntervalMin:   config.screeningIntervalMin,
+      autoPairs:              config.autoPairs,
+      pairsBlacklist:         config.pairsBlacklist,
+      openRouterModel:        config.openRouterModel,
+      ollamaMode:             config.ollamaMode,
+      ollamaBaseUrl:          config.ollamaBaseUrl,
+      evolveMinTrades:        config.evolveMinTrades,
     },
     evolve:       getEvolveSummary(),
     lessonsCount: getLessons().length,
@@ -175,6 +182,91 @@ app.get('/api/history', (_req, res) => {
 
 app.get('/api/radar', (_req, res) => {
   res.json(getRadarData());
+});
+
+// ── Settings API ─────────────────────────────────────────────────────────────
+
+// GET current editable config
+app.get('/api/settings', (_req, res) => {
+  res.json({
+    leverage:              config.leverage,
+    maxPositions:          config.maxPositions,
+    riskPerTrade:          config.riskPerTrade,
+    takeProfitPct:         config.takeProfitPct,
+    stopLossPct:           config.stopLossPct,
+    trailingStop:          config.trailingStop,
+    managementIntervalMin: config.managementIntervalMin,
+    screeningIntervalMin:  config.screeningIntervalMin,
+    evolveMinTrades:       config.evolveMinTrades,
+    autoPairs:             config.autoPairs,
+    pairs:                 (config.pairs || []).join(','),
+    pairsBlacklist:        (config.pairsBlacklist || []).join(','),
+    openRouterModel:       config.openRouterModel,
+    ollamaMode:            config.ollamaMode,
+    ollamaBaseUrl:         config.ollamaBaseUrl,
+  });
+});
+
+// POST update config — validates then persists to user-config.json
+app.post('/api/settings', (req, res) => {
+  const body    = req.body;
+  const updates = {};
+  const errors  = [];
+
+  // Numeric fields with bounds
+  const numFields = {
+    leverage:              [1, 20],
+    maxPositions:          [1, 10],
+    riskPerTrade:          [0.001, 0.1],
+    takeProfitPct:         [0.005, 0.5],
+    stopLossPct:           [0.002, 0.2],
+    managementIntervalMin: [1, 60],
+    screeningIntervalMin:  [5, 1440],
+    evolveMinTrades:       [3, 50],
+  };
+
+  for (const [field, [min, max]] of Object.entries(numFields)) {
+    if (body[field] !== undefined && body[field] !== '') {
+      const val = parseFloat(body[field]);
+      if (isNaN(val)) { errors.push(`${field}: harus angka`); continue; }
+      if (val < min || val > max) { errors.push(`${field}: harus antara ${min}–${max}`); continue; }
+      updates[field] = val;
+    }
+  }
+
+  // Boolean
+  if (body.trailingStop !== undefined) updates.trailingStop = body.trailingStop === true || body.trailingStop === 'true';
+  if (body.autoPairs    !== undefined) updates.autoPairs    = body.autoPairs    === true || body.autoPairs    === 'true';
+  if (body.ollamaMode   !== undefined) updates.ollamaMode   = body.ollamaMode   === true || body.ollamaMode   === 'true';
+
+  // String fields
+  if (body.openRouterModel !== undefined) updates.openRouterModel = String(body.openRouterModel).trim();
+  if (body.ollamaBaseUrl   !== undefined) updates.ollamaBaseUrl   = String(body.ollamaBaseUrl).trim();
+
+  // Pairs — comma-separated string → array
+  if (body.pairs !== undefined && body.pairs !== '') {
+    const parsed = String(body.pairs).split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+    if (!parsed.length) errors.push('pairs: minimal 1 pair');
+    else updates.pairs = parsed;
+  }
+
+  // Blacklist
+  if (body.pairsBlacklist !== undefined) {
+    updates.pairsBlacklist = body.pairsBlacklist === ''
+      ? []
+      : String(body.pairsBlacklist).split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+  }
+
+  if (errors.length) return res.status(400).json({ ok: false, errors });
+
+  try {
+    saveUserConfig(updates);
+    logger.sys(MOD, `Settings updated: ${JSON.stringify(updates)}`);
+    broadcast({ type: 'state', data: getFullState() });
+    res.json({ ok: true, updated: updates });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
 });
 
 app.get('/api/evolve/summary', (_req, res) => {
