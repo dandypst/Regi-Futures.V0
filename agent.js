@@ -672,34 +672,90 @@ Respond ONLY with raw JSON (no markdown):
 }
 
 // ═══════════════════════════════════════════════════════════
-//  AI CALLER
+//  AI CALLER — mendukung OpenRouter dan Ollama local
 // ═══════════════════════════════════════════════════════════
 
-async function callAI(prompt, type) {
-  try {
-    const res = await axios.post(
-      'https://openrouter.ai/api/v1/chat/completions',
-      {
-        model:      config.openRouterModel || 'anthropic/claude-3-haiku',
-        max_tokens: 600,
-        messages:   [{ role: 'user', content: prompt }],
-      },
-      {
-        headers: {
-          'Authorization': `Bearer ${config.openRouterApiKey}`,
-          'Content-Type':  'application/json',
-          'HTTP-Referer':  'https://github.com/rrl-futures',
-          'X-Title':       'RRL-Futures',
-        },
-        timeout: 30000,
-      }
-    );
+// Deteksi mode AI:
+// ollamaMode: true di user-config.json → pakai Ollama local
+// ollamaMode: false/tidak ada          → pakai OpenRouter
+function getAIConfig() {
+  const isOllama = config.ollamaMode === true;
+  return {
+    isOllama,
+    url:   isOllama
+      ? `${config.ollamaBaseUrl || 'http://localhost:11434'}/api/chat`
+      : 'https://openrouter.ai/api/v1/chat/completions',
+    model: config.openRouterModel || (isOllama ? 'qwen3' : 'anthropic/claude-3-haiku'),
+  };
+}
 
-    const raw    = res.data.choices[0].message.content.trim();
-    const clean  = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+async function callAI(prompt, type) {
+  const ai = getAIConfig();
+
+  if (!ai.isOllama && (!config.openRouterApiKey || config.openRouterApiKey.startsWith('GANTI_'))) {
+    logger.warn(MOD, 'Tidak ada OpenRouter key dan bukan mode Ollama — pakai rule-based');
+    return type === 'screening'
+      ? { action: 'WAIT', reasoning: 'No AI configured', confidence: 0 }
+      : { decisions: [] };
+  }
+
+  try {
+    let raw;
+
+    if (ai.isOllama) {
+      // ── Ollama /api/chat ─────────────────────────────────
+      const res = await axios.post(
+        ai.url,
+        {
+          model:    ai.model,
+          stream:   false,
+          messages: [{ role: 'user', content: prompt }],
+          options:  { temperature: 0.1, num_predict: 600 },
+        },
+        {
+          headers: { 'Content-Type': 'application/json' },
+          timeout: 120000, // Ollama local bisa lebih lambat
+        }
+      );
+      // Ollama response format: { message: { role, content }, done: true }
+      raw = res.data.message?.content?.trim() ?? '';
+      logger.ai(MOD, `Ollama (${ai.model}) responded`);
+
+    } else {
+      // ── OpenRouter /v1/chat/completions ──────────────────
+      const res = await axios.post(
+        ai.url,
+        {
+          model:      ai.model,
+          max_tokens: 600,
+          messages:   [{ role: 'user', content: prompt }],
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${config.openRouterApiKey}`,
+            'Content-Type':  'application/json',
+            'HTTP-Referer':  'https://github.com/rrl-futures',
+            'X-Title':       'RRL-Futures',
+          },
+          timeout: 30000,
+        }
+      );
+      raw = res.data.choices[0].message.content.trim();
+      logger.ai(MOD, `OpenRouter (${ai.model}) responded`);
+    }
+
+    // Strip markdown fences — berlaku untuk kedua provider
+    // Qwen3 kadang masih wrap dalam ```json``` dan tambahkan <think>...</think>
+    const clean = raw
+      .replace(/<think>[\s\S]*?<\/think>/gi, '') // hapus chain-of-thought Qwen3
+      .replace(/^```(?:json)?\s*/im, '')
+      .replace(/\s*```$/im, '')
+      .trim();
+
     const result = JSON.parse(clean);
-    logger.ai(MOD, `${type}: ${result.action || result.decisions?.length + ' decisions'}`);
+    logger.ai(MOD, `${type}: ${result.action || (result.decisions?.length ?? 0) + ' decisions'}`);
     return result;
+
   } catch (e) {
     logger.error(MOD, `AI call gagal (${type}): ${e.message}`);
     return type === 'screening'
