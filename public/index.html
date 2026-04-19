@@ -5,1149 +5,1433 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>RRL-Futures — AI Trading Agent</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --bg: #080c12;
-    --bg2: #0d1219;
-    --bg3: #111820;
-    --panel: #0f1822;
-    --border: #1a2535;
-    --border2: #243044;
-    --accent: #00e5ff;
-    --accent2: #7b5cff;
-    --green: #00ff9d;
-    --red: #ff3d6e;
-    --yellow: #ffd166;
-    --text: #e8f0fe;
-    --text2: #7a95b5;
-    --text3: #3d5570;
-    --mono: 'Space Mono', monospace;
-    --sans: 'DM Sans', sans-serif;
-    --radius: 8px;
-    --glow: 0 0 20px rgba(0,229,255,0.15);
-    --glow-green: 0 0 20px rgba(0,255,157,0.2);
-    --glow-red: 0 0 20px rgba(255,61,110,0.2);
+:root {
+  --bg:      #020810;
+  --bg2:     #050d18;
+  --bg3:     #080f1e;
+  --panel:   #060d1a;
+  --border:  #0d2035;
+  --border2: #143050;
+  --accent:  #00d4ff;
+  --accent2: #6c3cff;
+  --green:   #00ffaa;
+  --red:     #ff2d55;
+  --yellow:  #ffcc00;
+  --orange:  #ff6b35;
+  --text:    #c8e8ff;
+  --text2:   #5a8ab0;
+  --text3:   #1e3d5a;
+  --mono:    'Share Tech Mono', monospace;
+  --head:    'Orbitron', sans-serif;
+  --body:    'Rajdhani', sans-serif;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--body);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Animated grid background */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image:
+    linear-gradient(rgba(0,212,255,0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,212,255,0.025) 1px, transparent 1px);
+  background-size: 48px 48px;
+  animation: gridPan 30s linear infinite;
+  pointer-events: none; z-index: 0;
+}
+
+/* Radial glow center */
+body::after {
+  content: '';
+  position: fixed;
+  top: 0; left: 50%; transform: translateX(-50%);
+  width: 900px; height: 400px;
+  background: radial-gradient(ellipse at top, rgba(0,100,200,0.08) 0%, transparent 70%);
+  pointer-events: none; z-index: 0;
+}
+
+@keyframes gridPan { from { background-position: 0 0; } to { background-position: 48px 48px; } }
+@keyframes pulse   { 0%,100% { opacity:1; transform:scale(1); } 50% { opacity:.5; transform:scale(.75); } }
+@keyframes scan    { 0% { top: 0; } 100% { top: 100%; } }
+@keyframes blink   { 0%,100% { opacity:1; } 50% { opacity:.2; } }
+@keyframes glow    { 0%,100% { text-shadow: 0 0 8px rgba(0,212,255,.6); } 50% { text-shadow: 0 0 24px rgba(0,212,255,1),0 0 48px rgba(0,212,255,.4); } }
+@keyframes fadeIn  { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:none; } }
+@keyframes spin    { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }
+
+#app { position:relative; z-index:1; max-width:1800px; margin:0 auto; padding:0 16px 40px; }
+
+/* ── HEADER ── */
+header {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:16px 0 20px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 20px;
+  position: relative;
+}
+
+/* Scanning line on header bottom */
+header::after {
+  content: '';
+  position: absolute;
+  bottom: -1px; left: 0;
+  height: 1px; width: 30%;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  animation: scanHeader 3s ease-in-out infinite;
+}
+@keyframes scanHeader { 0%{left:0;opacity:1} 100%{left:70%;opacity:0} }
+
+.logo { display:flex; align-items:center; gap:12px; }
+
+.logo-hex {
+  width: 44px; height: 44px;
+  background: linear-gradient(135deg, #001830, #003060);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  display: flex; align-items:center; justify-content:center;
+  box-shadow: 0 0 20px rgba(0,212,255,0.3), inset 0 0 20px rgba(0,212,255,0.05);
+  position: relative; overflow: hidden;
+}
+
+.logo-hex::after {
+  content: '';
+  position: absolute; top: -50%; left: -50%;
+  width: 200%; height: 200%;
+  background: linear-gradient(45deg, transparent 40%, rgba(0,212,255,0.1) 50%, transparent 60%);
+  animation: logoShine 3s ease-in-out infinite;
+}
+@keyframes logoShine { 0%,100%{transform:rotate(0deg)} 50%{transform:rotate(360deg)} }
+
+.logo-icon { font-size: 20px; position: relative; z-index: 1; }
+
+.logo-name {
+  font-family: var(--head);
+  font-size: 20px;
+  font-weight: 900;
+  letter-spacing: 4px;
+  color: var(--accent);
+  animation: glow 3s ease-in-out infinite;
+}
+
+.logo-sub {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--text3);
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  margin-top: 3px;
+}
+
+/* ── HEADER RIGHT ── */
+.header-right { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+
+.hpill {
+  display:flex; align-items:center; gap:6px;
+  padding:6px 14px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.hdot {
+  width:7px; height:7px; border-radius:50%;
+  background: var(--text3);
+  transition: all .3s;
+  flex-shrink: 0;
+}
+.hdot.on    { background: var(--green);  box-shadow: 0 0 8px var(--green);  animation: pulse 2s infinite; }
+.hdot.off   { background: var(--red); }
+.hdot.warn  { background: var(--yellow); box-shadow: 0 0 8px var(--yellow); animation: pulse 1.5s infinite; }
+.hdot.dim   { background: var(--text3); opacity:.4; }
+
+/* Mode toggle */
+.mode-toggle { display:flex; background:var(--bg3); border:1px solid var(--border); border-radius:4px; overflow:hidden; }
+.mode-btn {
+  padding:6px 16px;
+  font-family:var(--mono); font-size:10px; letter-spacing:1px;
+  background:none; border:none; color:var(--text3);
+  cursor:pointer; transition:all .2s; text-transform:uppercase;
+}
+.mode-btn.active-testnet { background:rgba(108,60,255,.2); color:var(--accent2); }
+.mode-btn.active-live    { background:rgba(255,204,0,.12); color:var(--yellow); }
+
+/* ── TICKER STRIP ── */
+.ticker-strip {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  margin-bottom: 18px;
+  position: relative;
+}
+
+.ticker-strip::before, .ticker-strip::after {
+  content: '';
+  position: absolute; top:0; bottom:0;
+  width: 60px; z-index: 2;
+  pointer-events: none;
+}
+.ticker-strip::before { left:0; background: linear-gradient(90deg, var(--bg3), transparent); }
+.ticker-strip::after  { right:0; background: linear-gradient(-90deg, var(--bg3), transparent); }
+
+.ticker-label {
+  font-family: var(--mono); font-size: 9px;
+  color: var(--accent); letter-spacing: 2px;
+  padding: 0 16px; white-space: nowrap;
+  border-right: 1px solid var(--border);
+  height: 100%; display:flex; align-items:center;
+  background: linear-gradient(90deg, rgba(0,212,255,.05), transparent);
+}
+
+.ticker-scroll {
+  display: flex; align-items: center; gap: 32px;
+  animation: tickerMove 40s linear infinite;
+  padding: 0 20px;
+  white-space: nowrap;
+}
+@keyframes tickerMove { from{transform:translateX(0)} to{transform:translateX(-50%)} }
+
+.ticker-item {
+  display:flex; align-items:center; gap:8px;
+  font-family:var(--mono); font-size:10px;
+}
+.ticker-sym  { color:var(--text2); }
+.ticker-up   { color:var(--green); }
+.ticker-down { color:var(--red); }
+
+/* ── METRICS ROW ── */
+.metrics-row {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.metric {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 14px 16px;
+  position: relative; overflow: hidden;
+}
+
+.metric::before {
+  content: '';
+  position: absolute; top:0; left:0; right:0; height:2px;
+}
+.metric.c-accent::before  { background: var(--accent); }
+.metric.c-green::before   { background: var(--green); }
+.metric.c-red::before     { background: var(--red); }
+.metric.c-yellow::before  { background: var(--yellow); }
+.metric.c-purple::before  { background: var(--accent2); }
+
+/* Corner decoration */
+.metric::after {
+  content: '';
+  position: absolute; bottom:0; right:0;
+  width:40px; height:40px;
+  background: linear-gradient(225deg, rgba(0,212,255,.04), transparent);
+  border-top-left-radius: 40px;
+}
+
+.metric-label {
+  font-family: var(--mono); font-size: 9px;
+  color: var(--text3); letter-spacing: 2px;
+  text-transform: uppercase; margin-bottom: 8px;
+}
+
+.metric-value {
+  font-family: var(--head); font-size: 24px; font-weight: 700;
+  color: var(--text); line-height: 1;
+}
+.metric-value.pos { color: var(--green); }
+.metric-value.neg { color: var(--red); }
+.metric-sub { font-size:11px; color:var(--text3); margin-top:4px; font-family:var(--mono); }
+
+/* ── MAIN LAYOUT ── */
+.main-grid {
+  display: grid;
+  grid-template-columns: 260px 1fr 320px;
+  gap: 14px;
+}
+
+/* ── PANEL ── */
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 16px;
+  transition: border-color .2s;
+  position: relative;
+  overflow: hidden;
+}
+.panel:hover { border-color: var(--border2); }
+
+/* Scan line overlay on panels */
+.panel.scanning::before {
+  content: '';
+  position: absolute; left:0; right:0;
+  height: 60px;
+  background: linear-gradient(to bottom, transparent, rgba(0,212,255,.03), transparent);
+  animation: scan 3s linear infinite;
+  pointer-events: none; z-index: 0;
+}
+
+.panel-title {
+  font-family: var(--mono); font-size: 9px;
+  letter-spacing: 3px; text-transform: uppercase;
+  color: var(--text3); margin-bottom: 14px;
+  display: flex; align-items: center; gap: 8px;
+}
+.panel-title::after { content:''; flex:1; height:1px; background:var(--border); }
+
+/* ── LEFT COLUMN ── */
+.col-left { display:flex; flex-direction:column; gap:12px; }
+
+/* ── BUTTONS ── */
+.btn {
+  padding: 11px 16px;
+  border-radius: 4px; border: none;
+  cursor: pointer;
+  font-family: var(--mono); font-size: 10px;
+  letter-spacing: 2px; text-transform: uppercase;
+  width: 100%;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  transition: all .2s; position: relative; overflow: hidden;
+}
+
+.btn::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(to right, transparent, rgba(255,255,255,.05), transparent);
+  transform: translateX(-100%);
+  transition: transform .3s;
+}
+.btn:hover::after { transform: translateX(100%); }
+
+.btn-start {
+  background: linear-gradient(135deg, #006644, #00ffaa22);
+  color: var(--green);
+  border: 1px solid rgba(0,255,170,.3);
+  box-shadow: 0 0 20px rgba(0,255,170,.15);
+}
+.btn-start:hover { box-shadow: 0 0 30px rgba(0,255,170,.3); transform:translateY(-1px); }
+
+.btn-stop {
+  background: linear-gradient(135deg, #660020, #ff2d5522);
+  color: var(--red);
+  border: 1px solid rgba(255,45,85,.3);
+  box-shadow: 0 0 20px rgba(255,45,85,.15);
+}
+.btn-stop:hover { box-shadow: 0 0 30px rgba(255,45,85,.3); transform:translateY(-1px); }
+
+.btn-secondary {
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  color: var(--text2);
+}
+.btn-secondary:hover { border-color:var(--accent); color:var(--accent); }
+
+.btn:disabled { opacity:.3; cursor:not-allowed; transform:none !important; }
+
+.divider { height:1px; background:var(--border); margin:8px 0; }
+
+/* Config grid */
+.cfg-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.cfg-item { display:flex; flex-direction:column; gap:3px; }
+.cfg-label { font-family:var(--mono); font-size:9px; letter-spacing:1px; color:var(--text3); text-transform:uppercase; }
+.cfg-val   { font-family:var(--mono); font-size:14px; color:var(--accent); }
+
+/* ── CENTER ── */
+.col-center { display:flex; flex-direction:column; gap:12px; }
+
+/* ── RADAR SECTION (full width) ── */
+.radar-section {
+  grid-column: 1 / -1;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 16px;
+  position: relative; overflow: hidden;
+  margin-bottom: 4px;
+}
+
+/* Pulsing border on radar */
+.radar-section::before {
+  content: '';
+  position: absolute; inset: 0;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: linear-gradient(var(--panel), var(--panel)) padding-box,
+              linear-gradient(90deg, var(--accent), var(--accent2), var(--accent)) border-box;
+  opacity: .4;
+  animation: borderPulse 4s ease-in-out infinite;
+}
+@keyframes borderPulse { 0%,100%{opacity:.2} 50%{opacity:.6} }
+
+.radar-header {
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 14px; position: relative;
+}
+
+.radar-title {
+  font-family: var(--head); font-size: 13px; font-weight: 700;
+  letter-spacing: 3px; color: var(--accent);
+  text-transform: uppercase;
+}
+
+.radar-spinner {
+  width: 14px; height: 14px;
+  border: 2px solid var(--border2);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  flex-shrink: 0;
+}
+
+.radar-badge {
+  background: rgba(0,212,255,.12);
+  color: var(--accent); border: 1px solid rgba(0,212,255,.25);
+  padding: 2px 10px; border-radius: 2px;
+  font-family: var(--mono); font-size: 10px; letter-spacing: 1px;
+}
+
+.radar-ts {
+  margin-left: auto;
+  font-family: var(--mono); font-size: 9px; color: var(--text3);
+}
+
+.radar-next {
+  font-family: var(--mono); font-size: 9px;
+  color: var(--accent); opacity: .7;
+}
+
+.radar-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.radar-card {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 12px;
+  position: relative; overflow: hidden;
+  animation: fadeIn .4s ease;
+  cursor: default;
+  transition: border-color .2s, transform .2s;
+}
+.radar-card:hover { border-color:var(--border2); transform:translateY(-2px); }
+
+.radar-card-glow {
+  position: absolute; top:0; left:0; right:0; height:40px;
+  opacity: .06;
+}
+.radar-card.long  .radar-card-glow { background:linear-gradient(to bottom, var(--green), transparent); }
+.radar-card.short .radar-card-glow { background:linear-gradient(to bottom, var(--red),   transparent); }
+
+.rc-top {
+  display:flex; align-items:flex-start; justify-content:space-between;
+  margin-bottom:8px; position:relative;
+}
+.rc-sym  { font-family:var(--head); font-size:13px; font-weight:700; color:var(--text); }
+.rc-price{ font-family:var(--mono); font-size:10px; color:var(--text3); margin-top:2px; }
+.rc-side {
+  font-family:var(--mono); font-size:9px; letter-spacing:1px;
+  padding:2px 8px; border-radius:2px; font-weight:700;
+}
+.rc-side.long  { background:rgba(0,255,170,.12); color:var(--green); border:1px solid rgba(0,255,170,.25); }
+.rc-side.short { background:rgba(255,45,85,.12);  color:var(--red);   border:1px solid rgba(255,45,85,.25); }
+
+/* Score bar */
+.rc-score-row { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+.rc-score-num { font-family:var(--head); font-size:16px; font-weight:700; }
+.rc-score-num.s6 { color:var(--green);  text-shadow:0 0 12px rgba(0,255,170,.5); }
+.rc-score-num.s5 { color:var(--accent); text-shadow:0 0 12px rgba(0,212,255,.4); }
+.rc-score-num.s4 { color:var(--yellow); }
+.rc-score-track { flex:1; height:3px; background:var(--border); border-radius:2px; overflow:hidden; }
+.rc-score-fill  { height:100%; border-radius:2px; transition:width .5s ease; }
+.long  .rc-score-fill { background:linear-gradient(90deg, var(--accent), var(--green)); }
+.short .rc-score-fill { background:linear-gradient(90deg, var(--accent2), var(--red)); }
+
+/* Signal list */
+.rc-sigs { display:grid; grid-template-columns:1fr 1fr; gap:3px; margin-bottom:8px; }
+.rc-sig  { display:flex; align-items:center; gap:4px; font-family:var(--mono); font-size:9px; }
+.rc-sig-dot { width:5px; height:5px; border-radius:50%; flex-shrink:0; }
+.rc-sig.hit .rc-sig-dot { background:var(--green); box-shadow:0 0 4px var(--green); }
+.rc-sig.hit            { color:var(--text2); }
+.rc-sig.miss .rc-sig-dot { background:var(--border2); }
+.rc-sig.miss           { color:var(--text3); }
+
+.rc-footer {
+  display:flex; justify-content:space-between;
+  font-family:var(--mono); font-size:9px; color:var(--text3);
+  padding-top:7px; border-top:1px solid var(--border);
+}
+
+.radar-empty {
+  grid-column: 1/-1; text-align:center;
+  padding:32px; color:var(--text3);
+  font-family:var(--mono); font-size:11px;
+}
+
+/* ── POSITIONS ── */
+.pos-card {
+  background:var(--bg3); border:1px solid var(--border);
+  border-radius:4px; padding:12px;
+  display:flex; align-items:center; justify-content:space-between;
+  margin-bottom:8px;
+  animation: fadeIn .3s ease;
+}
+.pos-sym  { font-family:var(--head); font-size:14px; font-weight:700; }
+.pos-entry{ font-family:var(--mono); font-size:10px; color:var(--text3); margin-top:2px; }
+.pos-side { font-family:var(--mono); font-size:9px; padding:2px 8px; border-radius:2px; letter-spacing:1px; }
+.pos-side.long  { background:rgba(0,255,170,.12); color:var(--green); border:1px solid rgba(0,255,170,.2); }
+.pos-side.short { background:rgba(255,45,85,.12);  color:var(--red);   border:1px solid rgba(255,45,85,.2); }
+.pos-pnl  { font-family:var(--head); font-size:16px; font-weight:700; text-align:right; }
+.pos-pnl.pos { color:var(--green); }
+.pos-pnl.neg { color:var(--red); }
+
+/* ── LOG TERMINAL ── */
+.log-term {
+  background: #020509;
+  border: 1px solid var(--border); border-radius:4px;
+  padding: 12px; height: 280px;
+  overflow-y: auto; overflow-x: hidden;
+  font-family: var(--mono); font-size: 10px; line-height: 1.8;
+  scrollbar-width: thin; scrollbar-color: var(--border2) transparent;
+  position: relative;
+}
+.log-term::-webkit-scrollbar { width:3px; }
+.log-term::-webkit-scrollbar-thumb { background:var(--border2); border-radius:2px; }
+
+/* Blinking cursor at bottom */
+.log-cursor { display:inline-block; width:6px; height:12px; background:var(--accent); animation:blink 1s infinite; vertical-align:middle; }
+
+.log-row { display:flex; gap:8px; animation:fadeIn .2s ease; }
+.log-ts   { color:var(--text3); white-space:nowrap; font-size:9px; padding-top:1px; }
+.log-lv   { width:44px; flex-shrink:0; text-align:center; border-radius:2px; font-size:9px; padding:1px 0; }
+.log-lv.INFO  { color:var(--accent); }
+.log-lv.TRADE { color:var(--green);  background:rgba(0,255,170,.08); }
+.log-lv.WARN  { color:var(--yellow); }
+.log-lv.ERROR { color:var(--red);    background:rgba(255,45,85,.08); }
+.log-lv.AI    { color:var(--accent2); }
+.log-lv.SYS   { color:var(--text2); }
+.log-mod { color:var(--text3); font-size:9px; }
+.log-msg { color:var(--text2); word-break:break-all; }
+
+/* ── RIGHT COLUMN ── */
+.col-right { display:flex; flex-direction:column; gap:12px; }
+
+/* ── TABS ── */
+.tabs { display:flex; gap:2px; margin-bottom:12px; background:var(--bg3); border-radius:3px; padding:3px; }
+.tab {
+  flex:1; padding:6px; background:none; border:none;
+  border-radius:2px; color:var(--text3);
+  font-family:var(--mono); font-size:9px; letter-spacing:1px;
+  text-transform:uppercase; cursor:pointer; transition:all .2s;
+}
+.tab.active { background:var(--panel); color:var(--accent); border:1px solid var(--border2); }
+
+.tab-content { display:none; max-height:360px; overflow-y:auto; scrollbar-width:thin; scrollbar-color:var(--border2) transparent; }
+.tab-content.active { display:block; }
+.tab-content::-webkit-scrollbar { width:3px; }
+.tab-content::-webkit-scrollbar-thumb { background:var(--border2); }
+
+/* Lesson card */
+.lesson-item {
+  padding:9px 10px; border-radius:3px;
+  background:var(--bg3); border-left:2px solid var(--accent2);
+  margin-bottom:6px; font-size:12px; line-height:1.5; color:var(--text2);
+}
+.lesson-meta { font-family:var(--mono); font-size:9px; color:var(--text3); margin-bottom:3px; }
+
+/* Memory table */
+.mem-table { width:100%; border-collapse:collapse; }
+.mem-table th { font-family:var(--mono); font-size:8px; letter-spacing:1px; color:var(--text3); text-align:left; padding:0 6px 8px; text-transform:uppercase; border-bottom:1px solid var(--border); }
+.mem-table td { padding:7px 6px; font-family:var(--mono); font-size:11px; color:var(--text2); border-bottom:1px solid var(--border); }
+.score-bar { display:flex; align-items:center; gap:5px; }
+.score-track { flex:1; height:3px; background:var(--bg3); border-radius:2px; overflow:hidden; }
+.score-fill  { height:100%; border-radius:2px; transition:width .5s; }
+
+/* History row */
+.hist-row { padding:9px 0; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; }
+.hist-sym  { font-family:var(--head); font-size:12px; }
+.hist-meta { font-size:10px; color:var(--text3); margin-top:2px; }
+.hist-pnl  { font-family:var(--head); font-size:13px; font-weight:700; }
+
+/* ── CYCLE INFO ── */
+.cycle-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+
+/* Evolve */
+.evolve-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+
+/* ── SCROLLBAR ── */
+.scroll-panel { overflow-y:auto; scrollbar-width:thin; scrollbar-color:var(--border2) transparent; }
+.scroll-panel::-webkit-scrollbar { width:3px; }
+.scroll-panel::-webkit-scrollbar-thumb { background:var(--border2); border-radius:2px; }
+
+/* ── TOAST ── */
+#toast {
+  position:fixed; bottom:24px; right:24px;
+  padding:10px 18px;
+  background:var(--panel); border:1px solid var(--border2);
+  border-radius:4px; font-family:var(--mono); font-size:10px; color:var(--text);
+  z-index:1000; transform:translateY(80px); opacity:0; transition:all .3s;
+  max-width:300px;
+}
+#toast.show    { transform:none; opacity:1; }
+#toast.success { border-color:var(--green); color:var(--green); }
+#toast.error   { border-color:var(--red);   color:var(--red); }
+#toast.warn    { border-color:var(--yellow); color:var(--yellow); }
+
+/* ── EMPTY ── */
+.empty { text-align:center; padding:28px; color:var(--text3); font-family:var(--mono); font-size:10px; }
+.empty-icon { font-size:24px; margin-bottom:8px; opacity:.3; }
+
+  /* ── Settings Modal ── */
+  .modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(2,8,16,.85);
+    backdrop-filter: blur(6px);
+    z-index: 200;
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; pointer-events: none;
+    transition: opacity .25s;
   }
+  .modal-overlay.open { opacity: 1; pointer-events: all; }
 
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: var(--sans);
-    min-height: 100vh;
-    overflow-x: hidden;
-  }
-
-  /* Background grid */
-  body::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background-image:
-      linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
-    background-size: 40px 40px;
-    pointer-events: none;
-    z-index: 0;
-  }
-
-  /* Scanline effect */
-  body::after {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background: repeating-linear-gradient(
-      0deg, transparent, transparent 2px,
-      rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px
-    );
-    pointer-events: none;
-    z-index: 0;
-  }
-
-  #app {
+  .modal {
+    background: var(--bg2);
+    border: 1px solid var(--border2);
+    border-radius: 8px;
+    width: min(860px, 95vw);
+    max-height: 88vh;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border2) transparent;
+    box-shadow: 0 0 60px rgba(0,212,255,.12), 0 30px 80px rgba(0,0,0,.6);
+    animation: fadeIn .25s ease;
     position: relative;
-    z-index: 1;
-    max-width: 1600px;
-    margin: 0 auto;
-    padding: 0 20px 40px;
+  }
+  .modal::-webkit-scrollbar { width: 4px; }
+  .modal::-webkit-scrollbar-thumb { background: var(--border2); }
+
+  .modal-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 20px 24px 0;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 16px;
+    position: sticky; top: 0; background: var(--bg2); z-index: 1;
   }
 
-  /* ── Header ── */
-  header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 20px 0 24px;
-    border-bottom: 1px solid var(--border);
+  .modal-title {
+    font-family: var(--head); font-size: 14px; font-weight: 700;
+    letter-spacing: 3px; color: var(--accent); text-transform: uppercase;
+  }
+
+  .modal-close {
+    background: none; border: none; cursor: pointer;
+    color: var(--text3); font-size: 20px; line-height: 1;
+    padding: 4px 8px; border-radius: 3px;
+    transition: color .2s;
+  }
+  .modal-close:hover { color: var(--red); }
+
+  .modal-body { padding: 20px 24px; }
+
+  .settings-section {
     margin-bottom: 24px;
   }
 
-  .logo {
-    display: flex;
-    align-items: center;
+  .settings-section-title {
+    font-family: var(--mono); font-size: 9px; letter-spacing: 3px;
+    color: var(--accent2); text-transform: uppercase;
+    margin-bottom: 14px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  .settings-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
     gap: 14px;
   }
 
-  .logo-icon {
-    width: 40px; height: 40px;
-    background: linear-gradient(135deg, var(--accent), var(--accent2));
-    border-radius: 10px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 20px;
+  .settings-grid.wide { grid-template-columns: 1fr 1fr; }
+  .settings-grid.full { grid-template-columns: 1fr; }
+
+  .field {
+    display: flex; flex-direction: column; gap: 6px;
   }
 
-  .logo-text {
-    font-family: var(--mono);
-    font-size: 22px;
-    font-weight: 700;
-    color: var(--accent);
-    letter-spacing: 4px;
-    text-shadow: 0 0 30px rgba(0,229,255,0.5);
+  .field label {
+    font-family: var(--mono); font-size: 9px; letter-spacing: 1.5px;
+    color: var(--text3); text-transform: uppercase;
   }
 
-  .logo-sub {
-    font-size: 11px;
-    color: var(--text3);
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    margin-top: 2px;
-  }
-
-  .header-right {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-  }
-
-  .status-pill {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 16px;
-    border-radius: 100px;
-    background: var(--bg3);
-    border: 1px solid var(--border);
-    font-family: var(--mono);
-    font-size: 12px;
-    letter-spacing: 1px;
-  }
-
-  .status-dot {
-    width: 8px; height: 8px;
-    border-radius: 50%;
-    background: var(--text3);
-    transition: all 0.3s;
-  }
-
-  .status-dot.running {
-    background: var(--green);
-    box-shadow: 0 0 8px var(--green);
-    animation: pulse 2s infinite;
-  }
-
-  .status-dot.stopped { background: var(--red); }
-
-  @keyframes pulse {
-    0%, 100% { opacity: 1; transform: scale(1); }
-    50% { opacity: 0.6; transform: scale(0.8); }
-  }
-
-  /* ── Mode toggle ── */
-  .mode-toggle {
-    display: flex;
-    background: var(--bg3);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    overflow: hidden;
-  }
-
-  .mode-btn {
-    padding: 8px 18px;
-    font-family: var(--mono);
-    font-size: 12px;
-    letter-spacing: 1px;
-    background: none;
-    border: none;
-    color: var(--text3);
-    cursor: pointer;
-    transition: all 0.2s;
-    text-transform: uppercase;
-  }
-
-  .mode-btn.active-testnet {
-    background: rgba(123,92,255,0.2);
-    color: var(--accent2);
-    box-shadow: inset 0 0 20px rgba(123,92,255,0.1);
-  }
-
-  .mode-btn.active-live {
-    background: rgba(255,209,102,0.15);
-    color: var(--yellow);
-    box-shadow: inset 0 0 20px rgba(255,209,102,0.1);
-  }
-
-  /* ── Grid layout ── */
-  .grid {
-    display: grid;
-    grid-template-columns: 280px 1fr 340px;
-    grid-template-rows: auto auto 1fr;
-    gap: 16px;
-  }
-
-  @media (max-width: 1200px) {
-    .grid { grid-template-columns: 1fr 1fr; }
-    .col-left { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
-    .col-right { grid-column: 1 / -1; }
-  }
-
-  /* ── Panel base ── */
-  .panel {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 20px;
-    transition: border-color 0.3s;
-  }
-
-  .panel:hover { border-color: var(--border2); }
-
-  .panel-title {
-    font-family: var(--mono);
-    font-size: 10px;
-    letter-spacing: 3px;
-    text-transform: uppercase;
-    color: var(--text3);
-    margin-bottom: 16px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .panel-title::after {
-    content: '';
-    flex: 1;
-    height: 1px;
-    background: var(--border);
-  }
-
-  /* ── Metric cards ── */
-  .metrics-row {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 12px;
-    margin-bottom: 16px;
-    grid-column: 1 / -1;
-  }
-
-  .metric {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 16px 20px;
-    position: relative;
-    overflow: hidden;
-  }
-
-  .metric::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 2px;
-    background: var(--accent);
-    opacity: 0.4;
-  }
-
-  .metric.green::before { background: var(--green); }
-  .metric.red::before { background: var(--red); }
-  .metric.purple::before { background: var(--accent2); }
-
-  .metric-label {
-    font-size: 11px;
-    color: var(--text3);
-    letter-spacing: 1px;
-    text-transform: uppercase;
-    margin-bottom: 8px;
-    font-family: var(--mono);
-  }
-
-  .metric-value {
-    font-family: var(--mono);
-    font-size: 26px;
-    font-weight: 700;
-    color: var(--text);
-    line-height: 1;
-  }
-
-  .metric-value.pos { color: var(--green); }
-  .metric-value.neg { color: var(--red); }
-  .metric-sub { font-size: 12px; color: var(--text3); margin-top: 4px; }
-
-  /* ── Left column ── */
-  .col-left {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-  }
-
-  /* ── Control panel ── */
-  .controls {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-  }
-
-  .btn {
-    padding: 12px 20px;
-    border-radius: 8px;
-    border: none;
-    cursor: pointer;
-    font-family: var(--mono);
-    font-size: 12px;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    transition: all 0.2s;
-    width: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-  }
-
-  .btn-start {
-    background: linear-gradient(135deg, #00b96b, #00ff9d);
-    color: #001a0d;
-    box-shadow: 0 4px 20px rgba(0,255,157,0.3);
-  }
-
-  .btn-start:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 8px 30px rgba(0,255,157,0.4);
-  }
-
-  .btn-stop {
-    background: linear-gradient(135deg, #c0203e, #ff3d6e);
-    color: white;
-    box-shadow: 0 4px 20px rgba(255,61,110,0.3);
-  }
-
-  .btn-stop:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 8px 30px rgba(255,61,110,0.4);
-  }
-
-  .btn-secondary {
+  .field input, .field select {
     background: var(--bg3);
     border: 1px solid var(--border2);
-    color: var(--text2);
-  }
-
-  .btn-secondary:hover {
-    border-color: var(--accent);
-    color: var(--accent);
-    background: rgba(0,229,255,0.05);
-  }
-
-  .btn:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-    transform: none !important;
-  }
-
-  /* ── Positions ── */
-  .position-card {
-    background: var(--bg3);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 14px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    transition: border-color 0.2s;
-  }
-
-  .position-card:hover { border-color: var(--border2); }
-
-  .pos-symbol {
-    font-family: var(--mono);
-    font-size: 14px;
-    font-weight: 700;
+    border-radius: 3px;
     color: var(--text);
+    font-family: var(--mono); font-size: 12px;
+    padding: 8px 10px;
+    outline: none;
+    transition: border-color .2s, box-shadow .2s;
+    width: 100%;
+  }
+  .field input:focus, .field select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(0,212,255,.1);
+  }
+  .field input[type=range] { padding: 4px 0; cursor: pointer; accent-color: var(--accent); }
+
+  .field .hint {
+    font-family: var(--mono); font-size: 9px; color: var(--text3);
   }
 
-  .pos-side {
-    font-size: 10px;
-    padding: 3px 8px;
-    border-radius: 4px;
-    font-family: var(--mono);
-    letter-spacing: 1px;
-  }
-
-  .pos-side.long {
-    background: rgba(0,255,157,0.15);
-    color: var(--green);
-    border: 1px solid rgba(0,255,157,0.3);
-  }
-
-  .pos-side.short {
-    background: rgba(255,61,110,0.15);
-    color: var(--red);
-    border: 1px solid rgba(255,61,110,0.3);
-  }
-
-  .pos-pnl {
-    font-family: var(--mono);
-    font-size: 15px;
-    font-weight: 700;
+  .field .range-val {
+    font-family: var(--mono); font-size: 11px; color: var(--accent);
     text-align: right;
   }
 
-  .pos-pnl.pos { color: var(--green); }
-  .pos-pnl.neg { color: var(--red); }
+  /* Toggle switch */
+  .toggle-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 0; border-bottom: 1px solid var(--border);
+  }
+  .toggle-row:last-child { border-bottom: none; }
+  .toggle-label { font-family: var(--mono); font-size: 10px; color: var(--text2); }
+  .toggle-desc  { font-family: var(--mono); font-size: 9px; color: var(--text3); margin-top: 2px; }
 
-  /* ── Log terminal ── */
-  .log-terminal {
-    background: #060a0f;
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 16px;
-    height: 340px;
-    overflow-y: auto;
-    font-family: var(--mono);
-    font-size: 11px;
-    line-height: 1.7;
-    scrollbar-width: thin;
-    scrollbar-color: var(--border2) transparent;
+  .toggle {
+    position: relative; width: 36px; height: 20px; flex-shrink: 0;
+  }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle-slider {
+    position: absolute; inset: 0;
+    background: var(--border2); border-radius: 20px; cursor: pointer;
+    transition: background .2s;
+  }
+  .toggle-slider::before {
+    content: ''; position: absolute;
+    width: 14px; height: 14px; left: 3px; top: 3px;
+    background: var(--text3); border-radius: 50%; transition: all .2s;
+  }
+  .toggle input:checked + .toggle-slider { background: rgba(0,212,255,.3); border: 1px solid var(--accent); }
+  .toggle input:checked + .toggle-slider::before { transform: translateX(16px); background: var(--accent); }
+
+  /* Save button */
+  .settings-footer {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 24px;
+    border-top: 1px solid var(--border);
+    position: sticky; bottom: 0; background: var(--bg2);
+    gap: 12px;
   }
 
-  .log-terminal::-webkit-scrollbar { width: 4px; }
-  .log-terminal::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
-
-  .log-entry { display: flex; gap: 10px; animation: fadeIn 0.3s ease; }
-
-  @keyframes fadeIn { from { opacity: 0; transform: translateX(-4px); } to { opacity: 1; } }
-
-  .log-ts { color: var(--text3); white-space: nowrap; }
-  .log-level { width: 50px; flex-shrink: 0; text-align: center; padding: 0 4px; border-radius: 3px; }
-  .log-level.INFO  { color: var(--accent); }
-  .log-level.TRADE { color: var(--green); background: rgba(0,255,157,0.1); }
-  .log-level.WARN  { color: var(--yellow); }
-  .log-level.ERROR { color: var(--red); background: rgba(255,61,110,0.1); }
-  .log-level.AI    { color: var(--accent2); }
-  .log-level.SYS   { color: var(--text2); }
-  .log-mod  { color: var(--text3); font-size: 10px; }
-  .log-msg  { color: var(--text2); word-break: break-all; }
-
-  /* ── Lessons / Memory tabs ── */
-  .tabs {
-    display: flex;
-    gap: 2px;
-    margin-bottom: 16px;
-    background: var(--bg3);
-    border-radius: 8px;
-    padding: 4px;
-  }
-
-  .tab {
-    flex: 1;
-    padding: 7px;
-    background: none;
-    border: none;
-    border-radius: 6px;
-    color: var(--text3);
-    font-family: var(--mono);
-    font-size: 10px;
-    letter-spacing: 1px;
-    text-transform: uppercase;
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-
-  .tab.active {
-    background: var(--panel);
-    color: var(--accent);
-    border: 1px solid var(--border2);
-  }
-
-  .tab-content { display: none; }
-  .tab-content.active { display: block; }
-
-  /* ── Lessons list ── */
-  .lesson-item {
-    padding: 10px 12px;
-    border-radius: 6px;
-    background: var(--bg3);
-    border-left: 2px solid var(--accent2);
-    margin-bottom: 8px;
-    font-size: 12px;
-    line-height: 1.5;
-    color: var(--text2);
-  }
-
-  .lesson-meta {
-    font-family: var(--mono);
-    font-size: 10px;
-    color: var(--text3);
-    margin-bottom: 4px;
-  }
-
-  /* ── Memory table ── */
-  .memory-table { width: 100%; border-collapse: collapse; }
-  .memory-table th {
-    font-family: var(--mono);
-    font-size: 9px;
-    letter-spacing: 1px;
-    color: var(--text3);
-    text-align: left;
-    padding: 0 8px 8px;
-    text-transform: uppercase;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .memory-table td {
-    padding: 8px;
-    font-family: var(--mono);
-    font-size: 12px;
-    color: var(--text2);
-    border-bottom: 1px solid var(--border);
-  }
-
-  .score-bar {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-
-  .score-track {
-    flex: 1;
-    height: 4px;
-    background: var(--bg3);
+  .save-btn {
+    padding: 10px 28px;
+    background: linear-gradient(135deg, rgba(0,212,255,.15), rgba(0,212,255,.05));
+    border: 1px solid var(--accent);
     border-radius: 4px;
-    overflow: hidden;
-  }
-
-  .score-fill {
-    height: 100%;
-    border-radius: 4px;
-    transition: width 0.5s ease;
-  }
-
-  /* ── Config panel ── */
-  .config-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-
-  .config-item {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-
-  .config-label {
-    font-family: var(--mono);
-    font-size: 9px;
-    letter-spacing: 1px;
-    color: var(--text3);
-    text-transform: uppercase;
-  }
-
-  .config-val {
-    font-family: var(--mono);
-    font-size: 14px;
     color: var(--accent);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 2px;
+    cursor: pointer; text-transform: uppercase;
+    transition: all .2s;
   }
+  .save-btn:hover { background: rgba(0,212,255,.2); box-shadow: 0 0 20px rgba(0,212,255,.2); }
 
-  /* ── Toast ── */
-  #toast {
-    position: fixed;
-    bottom: 30px;
-    right: 30px;
-    padding: 12px 20px;
-    background: var(--panel);
-    border: 1px solid var(--border2);
-    border-radius: 8px;
-    font-family: var(--mono);
-    font-size: 12px;
-    color: var(--text);
-    z-index: 1000;
-    transform: translateY(100px);
-    opacity: 0;
-    transition: all 0.3s;
-    max-width: 320px;
+  .cancel-btn {
+    padding: 10px 20px;
+    background: none; border: 1px solid var(--border2);
+    border-radius: 4px; color: var(--text3);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 2px;
+    cursor: pointer; text-transform: uppercase; transition: all .2s;
   }
+  .cancel-btn:hover { color: var(--text2); border-color: var(--border2); }
 
-  #toast.show { transform: translateY(0); opacity: 1; }
-  #toast.success { border-color: var(--green); color: var(--green); }
-  #toast.error { border-color: var(--red); color: var(--red); }
-
-  /* ── Scroll ── */
-  .scroll-panel { max-height: 280px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--border2) transparent; }
-  .scroll-panel::-webkit-scrollbar { width: 4px; }
-  .scroll-panel::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
-
-  /* ── Connection indicator ── */
-  .ws-indicator {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-family: var(--mono);
-    font-size: 10px;
-    color: var(--text3);
+  .save-msg {
+    font-family: var(--mono); font-size: 10px;
+    opacity: 0; transition: opacity .3s;
   }
+  .save-msg.show { opacity: 1; }
+  .save-msg.ok  { color: var(--green); }
+  .save-msg.err { color: var(--red); }
 
-  .ws-dot {
-    width: 6px; height: 6px;
-    border-radius: 50%;
-    background: var(--text3);
-    transition: all 0.3s;
-  }
-
-  .ws-dot.connected { background: var(--green); box-shadow: 0 0 6px var(--green); }
-  .ws-dot.disconnected { background: var(--red); }
-
-  /* Proxy indicator */
-  .proxy-pill {
-    display: flex; align-items: center; gap: 6px;
-    padding: 5px 12px; border-radius: 100px;
-    background: var(--bg3); border: 1px solid var(--border);
+  /* Settings button in header */
+  .btn-settings {
+    background: var(--bg3); border: 1px solid var(--border2);
+    border-radius: 4px; color: var(--text2);
     font-family: var(--mono); font-size: 10px; letter-spacing: 1px;
-    cursor: default;
+    padding: 6px 14px; cursor: pointer; transition: all .2s;
+    text-transform: uppercase;
   }
-  .proxy-dot {
-    width: 6px; height: 6px; border-radius: 50%;
-    background: var(--text3); transition: all 0.3s;
-  }
-  .proxy-dot.active   { background: var(--yellow); box-shadow: 0 0 6px var(--yellow); animation: pulse 2s infinite; }
-  .proxy-dot.standby  { background: var(--text3); }
-  .proxy-dot.none     { background: var(--text3); opacity: 0.4; }
+  .btn-settings:hover { border-color: var(--accent); color: var(--accent); }
 
-  /* ── Divider ── */
-  .divider { height: 1px; background: var(--border); margin: 12px 0; }
-
-  /* ── Empty state ── */
-  .empty {
-    text-align: center;
-    padding: 30px;
-    color: var(--text3);
-    font-size: 12px;
-    font-family: var(--mono);
-  }
-
-  .empty-icon { font-size: 28px; margin-bottom: 8px; opacity: 0.4; }
 </style>
 </head>
 <body>
 <div id="app">
 
-  <!-- Header -->
-  <header>
-    <div class="logo">
-      <div class="logo-icon">⚡</div>
-      <div>
-        <div class="logo-text">RRL-FUTURES</div>
-        <div class="logo-sub">AI Trading Agent</div>
-      </div>
-    </div>
-
-    <div class="header-right">
-      <div class="ws-indicator">
-        <div class="ws-dot" id="wsDot"></div>
-        <span id="wsStatus">connecting</span>
-      </div>
-
-      <div class="proxy-pill" id="proxyPill" title="Status koneksi ke Binance">
-        <div class="proxy-dot none" id="proxyDot"></div>
-        <span id="proxyLabel">PROXY —</span>
-      </div>
-
-      <div class="mode-toggle">
-        <button class="mode-btn" id="btnTestnet" onclick="setMode('testnet')">TESTNET</button>
-        <button class="mode-btn" id="btnLive" onclick="setMode('live')">⚠ LIVE</button>
-      </div>
-
-      <div class="status-pill">
-        <div class="status-dot" id="agentDot"></div>
-        <span id="agentStatus">OFFLINE</span>
-      </div>
-    </div>
-  </header>
-
-  <!-- Metrics row -->
-  <div class="metrics-row">
-    <div class="metric green">
-      <div class="metric-label">Balance (USDT)</div>
-      <div class="metric-value pos" id="metBalance">—</div>
-      <div class="metric-sub">Available</div>
-    </div>
-    <div class="metric">
-      <div class="metric-label">Open Positions</div>
-      <div class="metric-value" id="metPositions">0</div>
-      <div class="metric-sub" id="metMaxPos">/ — max</div>
-    </div>
-    <div class="metric green">
-      <div class="metric-label">Win Rate</div>
-      <div class="metric-value" id="metWinRate">0%</div>
-      <div class="metric-sub" id="metTrades">0 trades</div>
-    </div>
-    <div class="metric purple">
-      <div class="metric-label">Total PnL</div>
-      <div class="metric-value" id="metPnl">0.00</div>
-      <div class="metric-sub" id="metTodayPnl">Today: 0.00</div>
+<!-- Header -->
+<header>
+  <div class="logo">
+    <div class="logo-hex"><span class="logo-icon">⚡</span></div>
+    <div>
+      <div class="logo-name">RRL-FUTURES</div>
+      <div class="logo-sub">AI Binance Futures Trading Agent</div>
     </div>
   </div>
 
-  <!-- Main grid -->
-  <div class="grid">
-
-    <!-- LEFT: controls + config -->
-    <div class="col-left">
-
-      <!-- Controls -->
-      <div class="panel">
-        <div class="panel-title">Controls</div>
-        <div class="controls">
-          <button class="btn btn-start" id="btnStart" onclick="startAgent()">
-            ▶ Start Agent
-          </button>
-          <button class="btn btn-stop" id="btnStop" onclick="stopAgent()" disabled>
-            ■ Stop Agent
-          </button>
-          <div class="divider"></div>
-          <button class="btn btn-secondary" onclick="runEvolve()">
-            ⚙ Evolve Thresholds
-          </button>
-          <button class="btn btn-secondary" onclick="runLearn()">
-            📚 Generate Lessons
-          </button>
-        </div>
-      </div>
-
-      <!-- Config display -->
-      <div class="panel">
-        <div class="panel-title">Parameters</div>
-        <div class="config-grid" id="configGrid">
-          <div class="config-item">
-            <div class="config-label">Leverage</div>
-            <div class="config-val" id="cfgLeverage">—</div>
-          </div>
-          <div class="config-item">
-            <div class="config-label">Risk/Trade</div>
-            <div class="config-val" id="cfgRisk">—</div>
-          </div>
-          <div class="config-item">
-            <div class="config-label">Take Profit</div>
-            <div class="config-val" id="cfgTP">—</div>
-          </div>
-          <div class="config-item">
-            <div class="config-label">Stop Loss</div>
-            <div class="config-val" id="cfgSL">—</div>
-          </div>
-          <div class="config-item">
-            <div class="config-label">Max Positions</div>
-            <div class="config-val" id="cfgMaxPos">—</div>
-          </div>
-          <div class="config-item">
-            <div class="config-label">Cycles</div>
-            <div class="config-val" id="cfgCycles">—</div>
-          </div>
-        </div>
-        <div class="divider"></div>
-        <div class="config-item" style="margin-top:4px">
-          <div class="config-label">Active Pairs</div>
-          <div class="config-val" id="cfgPairs" style="font-size:11px; word-break:break-all">—</div>
-        </div>
-      </div>
-
-      <!-- Evolve summary -->
-      <div class="panel">
-        <div class="panel-title">Evolve Status</div>
-        <div id="evolveSummary" class="config-grid">
-          <div class="config-item">
-            <div class="config-label">Closed Trades</div>
-            <div class="config-val" id="evolveClosed">0</div>
-          </div>
-          <div class="config-item">
-            <div class="config-label">Can Evolve</div>
-            <div class="config-val" id="evolveReady">No</div>
-          </div>
-          <div class="config-item">
-            <div class="config-label">Win Rate</div>
-            <div class="config-val" id="evolveWR">0%</div>
-          </div>
-          <div class="config-item">
-            <div class="config-label">Avg PnL</div>
-            <div class="config-val" id="evolveAvgPnl">0</div>
-          </div>
-        </div>
-      </div>
-
+  <div class="header-right">
+    <div class="hpill">
+      <div class="hdot" id="wsDot"></div>
+      <span id="wsStatus">CONNECTING</span>
     </div>
 
-    <!-- CENTER: positions + log -->
-    <div style="display:flex;flex-direction:column;gap:16px;">
-
-      <!-- Positions -->
-      <div class="panel">
-        <div class="panel-title">Open Positions</div>
-        <div id="positionsList" class="scroll-panel">
-          <div class="empty">
-            <div class="empty-icon">📭</div>
-            No open positions
-          </div>
-        </div>
-      </div>
-
-      <!-- Log terminal -->
-      <div class="panel" style="flex:1">
-        <div class="panel-title" style="justify-content:space-between">
-          <span>Live Log</span>
-          <button onclick="clearLog()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:11px;font-family:var(--mono)">CLEAR</button>
-        </div>
-        <div class="log-terminal" id="logTerminal">
-          <div class="log-entry">
-            <span class="log-level SYS">SYS</span>
-            <span class="log-msg">Waiting for agent connection...</span>
-          </div>
-        </div>
-      </div>
-
+    <div class="hpill" id="proxyPill" title="Proxy status">
+      <div class="hdot dim" id="proxyDot"></div>
+      <span id="proxyLabel">PROXY —</span>
     </div>
 
-    <!-- RIGHT: lessons + memory -->
-    <div class="col-right" style="display:flex;flex-direction:column;gap:16px;">
+    <button class="btn-settings" onclick="openSettings()">⚙ SETTINGS</button>
 
-      <!-- Lessons / Memory tabs -->
-      <div class="panel" style="flex:1">
-        <div class="tabs">
-          <button class="tab active" id="tabLessons" onclick="switchTab('lessons')">Lessons</button>
-          <button class="tab" id="tabMemory" onclick="switchTab('memory')">Pair Memory</button>
-          <button class="tab" id="tabHistory" onclick="switchTab('history')">History</button>
-        </div>
+    <div class="mode-toggle">
+      <button class="mode-btn" id="btnTestnet" onclick="setMode('testnet')">TESTNET</button>
+      <button class="mode-btn" id="btnLive"    onclick="setMode('live')">⚠ LIVE</button>
+    </div>
 
-        <!-- Lessons tab -->
-        <div id="contentLessons" class="tab-content active scroll-panel" style="max-height:400px">
-          <div class="empty" id="lessonsEmpty">
-            <div class="empty-icon">📚</div>
-            No lessons yet
-          </div>
-          <div id="lessonsList"></div>
-        </div>
+    <div class="hpill">
+      <div class="hdot" id="agentDot"></div>
+      <span id="agentStatus">OFFLINE</span>
+    </div>
+  </div>
+</header>
 
-        <!-- Memory tab -->
-        <div id="contentMemory" class="tab-content scroll-panel" style="max-height:400px">
-          <table class="memory-table" id="memoryTable">
-            <thead>
-              <tr>
-                <th>Pair</th>
-                <th>Score</th>
-                <th>WR%</th>
-                <th>Trades</th>
-              </tr>
-            </thead>
-            <tbody id="memoryBody"></tbody>
-          </table>
-          <div class="empty" id="memoryEmpty" style="display:none">
-            <div class="empty-icon">🧠</div>
-            No memory yet
-          </div>
-        </div>
+<!-- Ticker strip -->
+<div class="ticker-strip">
+  <div class="ticker-label">◈ LIVE</div>
+  <div class="ticker-scroll" id="tickerScroll">
+    <span class="ticker-item"><span class="ticker-sym">BTCUSDT</span><span class="ticker-up" id="tk-BTCUSDT">—</span></span>
+    <span class="ticker-item"><span class="ticker-sym">ETHUSDT</span><span class="ticker-up" id="tk-ETHUSDT">—</span></span>
+    <span class="ticker-item"><span class="ticker-sym">BNBUSDT</span><span class="ticker-up" id="tk-BNBUSDT">—</span></span>
+    <span class="ticker-item"><span class="ticker-sym">SOLUSDT</span><span class="ticker-up" id="tk-SOLUSDT">—</span></span>
+    <span class="ticker-item"><span class="ticker-sym">XRPUSDT</span><span class="ticker-up" id="tk-XRPUSDT">—</span></span>
+    <!-- duplicated for seamless loop -->
+    <span class="ticker-item"><span class="ticker-sym">BTCUSDT</span><span class="ticker-up" id="tk-BTCUSDT2">—</span></span>
+    <span class="ticker-item"><span class="ticker-sym">ETHUSDT</span><span class="ticker-up" id="tk-ETHUSDT2">—</span></span>
+    <span class="ticker-item"><span class="ticker-sym">BNBUSDT</span><span class="ticker-up" id="tk-BNBUSDT2">—</span></span>
+    <span class="ticker-item"><span class="ticker-sym">SOLUSDT</span><span class="ticker-up" id="tk-SOLUSDT2">—</span></span>
+    <span class="ticker-item"><span class="ticker-sym">XRPUSDT</span><span class="ticker-up" id="tk-XRPUSDT2">—</span></span>
+  </div>
+</div>
 
-        <!-- History tab -->
-        <div id="contentHistory" class="tab-content scroll-panel" style="max-height:400px">
-          <div id="historyList">
-            <div class="empty">
-              <div class="empty-icon">📊</div>
-              No trade history yet
-            </div>
-          </div>
-        </div>
-      </div>
+<!-- Metrics -->
+<div class="metrics-row">
+  <div class="metric c-green">
+    <div class="metric-label">Balance USDT</div>
+    <div class="metric-value pos" id="metBalance">—</div>
+    <div class="metric-sub">Available</div>
+  </div>
+  <div class="metric c-accent">
+    <div class="metric-label">Open Positions</div>
+    <div class="metric-value" id="metPositions">0</div>
+    <div class="metric-sub" id="metMaxPos">/ — max</div>
+  </div>
+  <div class="metric c-yellow">
+    <div class="metric-label">Win Rate</div>
+    <div class="metric-value" id="metWinRate">0%</div>
+    <div class="metric-sub" id="metTrades">0 trades</div>
+  </div>
+  <div class="metric c-purple">
+    <div class="metric-label">Total PnL</div>
+    <div class="metric-value" id="metPnl">0.00</div>
+    <div class="metric-sub" id="metTodayPnl">Today: 0.00</div>
+  </div>
+  <div class="metric c-accent">
+    <div class="metric-label">Active Pairs</div>
+    <div class="metric-value" id="metPairs">0</div>
+    <div class="metric-sub" id="metCycles">0 cycles</div>
+  </div>
+</div>
 
-      <!-- Last cycle info -->
-      <div class="panel">
-        <div class="panel-title">Agent Cycles</div>
-        <div class="config-grid">
-          <div class="config-item">
-            <div class="config-label">Last Manage</div>
-            <div class="config-val" id="lastManage" style="font-size:11px">—</div>
-          </div>
-          <div class="config-item">
-            <div class="config-label">Last Screen</div>
-            <div class="config-val" id="lastScreen" style="font-size:11px">—</div>
-          </div>
-          <div class="config-item">
-            <div class="config-label">Lessons</div>
-            <div class="config-val" id="lessonsCount">0</div>
-          </div>
-          <div class="config-item">
-            <div class="config-label">Memory Pairs</div>
-            <div class="config-val" id="memoryPairs">0</div>
-          </div>
-        </div>
-      </div>
-
+<!-- ═══ RADAR (full width) ═══ -->
+<div class="radar-section">
+  <div class="radar-header">
+    <div class="radar-spinner"></div>
+    <div class="radar-title">Trading Radar</div>
+    <div class="radar-badge" id="radarBadge">0 signals</div>
+    <span class="radar-ts" id="radarTs">—</span>
+    <span class="radar-next" id="radarNext"></span>
+  </div>
+  <div class="radar-grid" id="radarGrid">
+    <div class="radar-empty">
+      <div style="font-size:30px;margin-bottom:8px;opacity:.25">📡</div>
+      SCANNING — Menunggu screening cycle pertama...<br>
+      <span style="font-size:9px;opacity:.5">Pairs dengan ≥4/6 sinyal akan muncul di sini</span>
     </div>
   </div>
 </div>
 
-<!-- Toast -->
+<!-- Main grid -->
+<div class="main-grid">
+
+  <!-- LEFT -->
+  <div class="col-left">
+    <div class="panel">
+      <div class="panel-title">Controls</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <button class="btn btn-start" id="btnStart" onclick="startAgent()">▶ START AGENT</button>
+        <button class="btn btn-stop"  id="btnStop"  onclick="stopAgent()" disabled>■ STOP AGENT</button>
+        <div class="divider"></div>
+        <button class="btn btn-secondary" onclick="runEvolve()">⚙ EVOLVE THRESHOLDS</button>
+        <button class="btn btn-secondary" onclick="runLearn()">📚 GENERATE LESSONS</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">Parameters</div>
+      <div class="cfg-grid">
+        <div class="cfg-item"><div class="cfg-label">Leverage</div><div class="cfg-val" id="cfgLev">—</div></div>
+        <div class="cfg-item"><div class="cfg-label">Risk/Trade</div><div class="cfg-val" id="cfgRisk">—</div></div>
+        <div class="cfg-item"><div class="cfg-label">Take Profit</div><div class="cfg-val" id="cfgTP">—</div></div>
+        <div class="cfg-item"><div class="cfg-label">Stop Loss</div><div class="cfg-val" id="cfgSL">—</div></div>
+        <div class="cfg-item"><div class="cfg-label">Max Pos</div><div class="cfg-val" id="cfgMaxPos">—</div></div>
+        <div class="cfg-item"><div class="cfg-label">Cycles</div><div class="cfg-val" id="cfgCycles">—</div></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">Evolve Status</div>
+      <div class="evolve-grid">
+        <div class="cfg-item"><div class="cfg-label">Closed</div><div class="cfg-val" id="evClosed">0</div></div>
+        <div class="cfg-item"><div class="cfg-label">Ready</div><div class="cfg-val" id="evReady">No</div></div>
+        <div class="cfg-item"><div class="cfg-label">Win Rate</div><div class="cfg-val" id="evWR">0%</div></div>
+        <div class="cfg-item"><div class="cfg-label">Avg PnL</div><div class="cfg-val" id="evAvg">0</div></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">Cycle Status</div>
+      <div class="cycle-grid">
+        <div class="cfg-item"><div class="cfg-label">Last Manage</div><div class="cfg-val" id="lastManage" style="font-size:11px">—</div></div>
+        <div class="cfg-item"><div class="cfg-label">Last Screen</div><div class="cfg-val" id="lastScreen" style="font-size:11px">—</div></div>
+        <div class="cfg-item"><div class="cfg-label">Lessons</div><div class="cfg-val" id="lessonsCount">0</div></div>
+        <div class="cfg-item"><div class="cfg-label">Memory Pairs</div><div class="cfg-val" id="memoryPairs">0</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CENTER -->
+  <div class="col-center">
+    <div class="panel">
+      <div class="panel-title">Open Positions</div>
+      <div id="positionsList" class="scroll-panel" style="max-height:200px">
+        <div class="empty"><div class="empty-icon">📭</div>No open positions</div>
+      </div>
+    </div>
+
+    <div class="panel scanning" style="flex:1">
+      <div class="panel-title" style="justify-content:space-between">
+        <span>Live Log</span>
+        <button onclick="clearLog()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-family:var(--mono);font-size:9px;letter-spacing:1px;">CLEAR</button>
+      </div>
+      <div class="log-term" id="logTerm">
+        <div class="log-row"><span class="log-lv SYS">SYS</span><span class="log-msg">Connecting to agent...</span></div>
+        <span class="log-cursor"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT -->
+  <div class="col-right">
+    <div class="panel" style="flex:1">
+      <div class="tabs">
+        <button class="tab active" id="tabLessons" onclick="switchTab('lessons')">Lessons</button>
+        <button class="tab" id="tabMemory"  onclick="switchTab('memory')">Memory</button>
+        <button class="tab" id="tabHistory" onclick="switchTab('history')">History</button>
+      </div>
+
+      <div id="contentLessons" class="tab-content active">
+        <div id="lessonsList"></div>
+        <div class="empty" id="lessonsEmpty"><div class="empty-icon">📚</div>No lessons yet</div>
+      </div>
+
+      <div id="contentMemory" class="tab-content">
+        <table class="mem-table"><thead><tr><th>Pair</th><th>Score</th><th>WR%</th><th>Trades</th></tr></thead>
+        <tbody id="memoryBody"></tbody></table>
+        <div class="empty" id="memoryEmpty" style="display:none"><div class="empty-icon">🧠</div>No memory yet</div>
+      </div>
+
+      <div id="contentHistory" class="tab-content">
+        <div id="historyList"><div class="empty"><div class="empty-icon">📊</div>No history yet</div></div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /main-grid -->
+
+<!-- Settings Modal -->
+<div class="modal-overlay" id="settingsOverlay" onclick="closeSettingsOutside(event)">
+  <div class="modal" id="settingsModal">
+    <div class="modal-header">
+      <div class="modal-title">⚙ Trading Parameters</div>
+      <button class="modal-close" onclick="closeSettings()">✕</button>
+    </div>
+
+    <div class="modal-body">
+
+      <!-- Risk Management -->
+      <div class="settings-section">
+        <div class="settings-section-title">◈ Risk Management</div>
+        <div class="settings-grid">
+          <div class="field">
+            <label>Leverage</label>
+            <input type="range" id="s_leverage" min="1" max="20" step="1" oninput="rangeVal('leverage',this.value,'x')">
+            <div class="range-val" id="s_leverage_val">—</div>
+            <div class="hint">1x – 20x</div>
+          </div>
+          <div class="field">
+            <label>Risk Per Trade</label>
+            <input type="range" id="s_riskPerTrade" min="0.001" max="0.05" step="0.001" oninput="rangeVal('riskPerTrade',this.value,'%',100)">
+            <div class="range-val" id="s_riskPerTrade_val">—</div>
+            <div class="hint">0.1% – 5% of balance</div>
+          </div>
+          <div class="field">
+            <label>Take Profit</label>
+            <input type="range" id="s_takeProfitPct" min="0.005" max="0.2" step="0.005" oninput="rangeVal('takeProfitPct',this.value,'%',100)">
+            <div class="range-val" id="s_takeProfitPct_val">—</div>
+            <div class="hint">0.5% – 20%</div>
+          </div>
+          <div class="field">
+            <label>Stop Loss</label>
+            <input type="range" id="s_stopLossPct" min="0.002" max="0.1" step="0.002" oninput="rangeVal('stopLossPct',this.value,'%',100)">
+            <div class="range-val" id="s_stopLossPct_val">—</div>
+            <div class="hint">0.2% – 10%</div>
+          </div>
+          <div class="field">
+            <label>Max Positions</label>
+            <input type="number" id="s_maxPositions" min="1" max="10" step="1">
+            <div class="hint">1 – 10 posisi sekaligus</div>
+          </div>
+          <div class="field">
+            <label>Evolve Min Trades</label>
+            <input type="number" id="s_evolveMinTrades" min="3" max="50" step="1">
+            <div class="hint">Min closed trades sebelum evolve</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Intervals -->
+      <div class="settings-section">
+        <div class="settings-section-title">◈ Cycle Intervals</div>
+        <div class="settings-grid">
+          <div class="field">
+            <label>Management Interval</label>
+            <input type="range" id="s_managementIntervalMin" min="1" max="60" step="1" oninput="rangeVal('managementIntervalMin',this.value,' min')">
+            <div class="range-val" id="s_managementIntervalMin_val">—</div>
+            <div class="hint">1 – 60 menit</div>
+          </div>
+          <div class="field">
+            <label>Screening Interval</label>
+            <input type="range" id="s_screeningIntervalMin" min="5" max="1440" step="5" oninput="rangeVal('screeningIntervalMin',this.value,' min')">
+            <div class="range-val" id="s_screeningIntervalMin_val">—</div>
+            <div class="hint">5 – 1440 menit</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pairs -->
+      <div class="settings-section">
+        <div class="settings-section-title">◈ Trading Pairs</div>
+        <div class="toggle-row">
+          <div>
+            <div class="toggle-label">Auto Pairs</div>
+            <div class="toggle-desc">Fetch semua pair aktif dari Binance otomatis</div>
+          </div>
+          <label class="toggle"><input type="checkbox" id="s_autoPairs" onchange="toggleAutoPairs(this.checked)"><span class="toggle-slider"></span></label>
+        </div>
+        <div id="s_manualPairsSection" class="settings-grid full" style="margin-top:12px">
+          <div class="field">
+            <label>Manual Pairs (comma-separated)</label>
+            <input type="text" id="s_pairs" placeholder="BTCUSDT,ETHUSDT,BNBUSDT">
+            <div class="hint">Dipakai jika Auto Pairs dimatikan</div>
+          </div>
+        </div>
+        <div class="settings-grid full" style="margin-top:12px">
+          <div class="field">
+            <label>Blacklist (comma-separated)</label>
+            <input type="text" id="s_pairsBlacklist" placeholder="BTCDOMUSDT,DEFIUSDT">
+            <div class="hint">Pair yang tidak akan pernah ditrade (berlaku di Auto Pairs)</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AI -->
+      <div class="settings-section">
+        <div class="settings-section-title">◈ AI Configuration</div>
+        <div class="toggle-row">
+          <div>
+            <div class="toggle-label">Ollama Mode (Local AI)</div>
+            <div class="toggle-desc">Gunakan Ollama local sebagai AI brain, bukan OpenRouter</div>
+          </div>
+          <label class="toggle"><input type="checkbox" id="s_ollamaMode" onchange="toggleOllama(this.checked)"><span class="toggle-slider"></span></label>
+        </div>
+        <div class="settings-grid wide" style="margin-top:12px">
+          <div class="field">
+            <label>Model Name</label>
+            <input type="text" id="s_openRouterModel" placeholder="anthropic/claude-3-haiku">
+            <div class="hint">OpenRouter: anthropic/claude-3-haiku | Ollama: qwen3</div>
+          </div>
+          <div class="field" id="s_ollamaUrlField">
+            <label>Ollama Base URL</label>
+            <input type="text" id="s_ollamaBaseUrl" placeholder="http://localhost:11434">
+          </div>
+        </div>
+      </div>
+
+      <!-- Toggles -->
+      <div class="settings-section">
+        <div class="settings-section-title">◈ Features</div>
+        <div class="toggle-row">
+          <div>
+            <div class="toggle-label">Trailing Stop</div>
+            <div class="toggle-desc">Aktifkan trailing stop loss</div>
+          </div>
+          <label class="toggle"><input type="checkbox" id="s_trailingStop"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+
+    </div><!-- /modal-body -->
+
+    <div class="settings-footer">
+      <div>
+        <span class="save-msg" id="saveMsg"></span>
+      </div>
+      <div style="display:flex;gap:10px">
+        <button class="cancel-btn" onclick="closeSettings()">CANCEL</button>
+        <button class="save-btn"   onclick="saveSettings()">SAVE & APPLY</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /app -->
+
 <div id="toast"></div>
 
 <script>
 const API = window.location.origin;
-let ws = null;
-let currentMode = 'testnet';
-let isRunning = false;
-const MAX_LOGS = 200;
+let ws = null, isRunning = false, currentMode = 'testnet';
 let logCount = 0;
+const MAX_LOGS = 300;
+
+// ── Countdown to next screening ───────────────────────────────────────────────
+let lastScreenTs = 0;
+const SCREEN_INTERVAL_MS = 30 * 60 * 1000;
+
+function updateCountdown() {
+  if (!isRunning || !lastScreenTs) { document.getElementById('radarNext').textContent = ''; return; }
+  const elapsed = Date.now() - lastScreenTs;
+  const remaining = Math.max(0, SCREEN_INTERVAL_MS - elapsed);
+  const m = Math.floor(remaining / 60000);
+  const s = Math.floor((remaining % 60000) / 1000);
+  document.getElementById('radarNext').textContent = `next scan: ${m}m ${s}s`;
+}
+setInterval(updateCountdown, 1000);
 
 // ── WebSocket ─────────────────────────────────────────────────────────────────
-
 function connectWS() {
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
   ws = new WebSocket(`${proto}//${location.host}`);
 
   ws.onopen = () => {
-    setWsStatus(true);
+    document.getElementById('wsDot').className = 'hdot on';
+    document.getElementById('wsStatus').textContent = 'ONLINE';
     appendLog('SYS', 'DASHBOARD', 'WebSocket connected');
   };
 
   ws.onmessage = (e) => {
     const msg = JSON.parse(e.data);
     if (msg.type === 'state') updateState(msg.data);
-    if (msg.type === 'log') appendLog(msg.data.level, msg.data.module, msg.data.msg);
+    if (msg.type === 'log') {
+      appendLog(msg.data.level, msg.data.module, msg.data.msg);
+      if (msg.data.level === 'AI' && msg.data.msg?.includes('Radar')) {
+        loadRadar();
+        lastScreenTs = Date.now();
+      }
+      if (msg.data.level === 'SYS' && msg.data.msg?.includes('Screening cycle')) {
+        lastScreenTs = Date.now();
+      }
+    }
   };
 
   ws.onclose = () => {
-    setWsStatus(false);
+    document.getElementById('wsDot').className = 'hdot off';
+    document.getElementById('wsStatus').textContent = 'OFFLINE';
     setTimeout(connectWS, 3000);
   };
-
-  ws.onerror = () => ws.close();
-}
-
-function setWsStatus(connected) {
-  document.getElementById('wsDot').className = 'ws-dot ' + (connected ? 'connected' : 'disconnected');
-  document.getElementById('wsStatus').textContent = connected ? 'connected' : 'reconnecting';
 }
 
 // ── State renderer ────────────────────────────────────────────────────────────
-
 function updateState(state) {
   if (!state) return;
-
-  isRunning = state.running;
+  isRunning   = state.running;
   currentMode = state.mode || 'testnet';
 
-  // Proxy status
+  document.getElementById('agentDot').className    = 'hdot ' + (isRunning ? 'on' : 'off');
+  document.getElementById('agentStatus').textContent = isRunning ? 'RUNNING' : 'OFFLINE';
+  document.getElementById('btnTestnet').className  = 'mode-btn ' + (currentMode === 'testnet' ? 'active-testnet' : '');
+  document.getElementById('btnLive').className     = 'mode-btn ' + (currentMode === 'live'    ? 'active-live'    : '');
+  document.getElementById('btnStart').disabled     = isRunning;
+  document.getElementById('btnStop').disabled      = !isRunning;
+
+  // Proxy
   if (state.proxy) {
-    const dot   = document.getElementById('proxyDot');
-    const label = document.getElementById('proxyLabel');
-    const pill  = document.getElementById('proxyPill');
-    if (!state.proxy.configured) {
-      dot.className   = 'proxy-dot none';
-      label.textContent = 'PROXY —';
-      pill.title      = 'Proxy tidak dikonfigurasi';
-    } else if (state.proxy.active) {
-      dot.className   = 'proxy-dot active';
-      label.textContent = 'PROXY ON';
-      pill.title      = `Proxy aktif: ${state.proxy.proxyUrl}`;
-    } else {
-      dot.className   = 'proxy-dot standby';
-      label.textContent = 'PROXY STANDBY';
-      pill.title      = `Proxy standby: ${state.proxy.proxyUrl}`;
-    }
+    const d = document.getElementById('proxyDot');
+    const l = document.getElementById('proxyLabel');
+    if (!state.proxy.configured) { d.className='hdot dim'; l.textContent='PROXY —'; }
+    else if (state.proxy.active) { d.className='hdot warn'; l.textContent='PROXY ON'; }
+    else                          { d.className='hdot'; l.textContent='PROXY STBY'; }
   }
 
-  // Agent status
-  const dot = document.getElementById('agentDot');
-  const statusEl = document.getElementById('agentStatus');
-  dot.className = 'status-dot ' + (isRunning ? 'running' : 'stopped');
-  statusEl.textContent = isRunning ? 'RUNNING' : 'OFFLINE';
-
-  // Mode buttons
-  document.getElementById('btnTestnet').className = 'mode-btn ' + (currentMode === 'testnet' ? 'active-testnet' : '');
-  document.getElementById('btnLive').className = 'mode-btn ' + (currentMode === 'live' ? 'active-live' : '');
-
-  // Control buttons
-  document.getElementById('btnStart').disabled = isRunning;
-  document.getElementById('btnStop').disabled = !isRunning;
-
-  // Balance
-  const bal = state.balance?.USDT || '—';
-  document.getElementById('metBalance').textContent = bal !== '—' ? parseFloat(bal).toFixed(2) : '—';
-
-  // Positions
-  document.getElementById('metPositions').textContent = (state.openPositions || []).length;
-  document.getElementById('metMaxPos').textContent = `/ ${state.config?.maxPositions || '?'} max`;
-  renderPositions(state.openPositions || []);
-
   // Metrics
-  const m = state.metrics || {};
-  const wr = parseFloat(m.winRate || 0);
-  document.getElementById('metWinRate').textContent = wr.toFixed(1) + '%';
-  document.getElementById('metWinRate').className = 'metric-value ' + (wr >= 50 ? 'pos' : 'neg');
-  document.getElementById('metTrades').textContent = `${m.totalTrades || 0} trades`;
+  const bal = state.balance?.USDT || '—';
+  document.getElementById('metBalance').textContent   = bal !== '—' ? parseFloat(bal).toFixed(2) : '—';
+  document.getElementById('metPositions').textContent = (state.openPositions||[]).length;
+  document.getElementById('metMaxPos').textContent    = `/ ${state.config?.maxPositions||'?'} max`;
+  document.getElementById('metPairs').textContent     = (state.config?.pairs||[]).length || '—';
+  document.getElementById('metCycles').textContent    = `${state.cycles||0} cycles`;
 
-  const pnl = parseFloat(m.totalPnl || 0);
-  const pnlEl = document.getElementById('metPnl');
-  pnlEl.textContent = pnl.toFixed(2);
-  pnlEl.className = 'metric-value ' + (pnl >= 0 ? 'pos' : 'neg');
-  const todayPnl = parseFloat(m.todayPnl || 0);
-  document.getElementById('metTodayPnl').textContent = `Today: ${todayPnl >= 0 ? '+' : ''}${todayPnl.toFixed(2)}`;
+  const m = state.metrics || {};
+  const wr = parseFloat(m.winRate||0);
+  const el = document.getElementById('metWinRate');
+  el.textContent = wr.toFixed(1) + '%';
+  el.className   = 'metric-value ' + (wr >= 50 ? 'pos' : 'neg');
+  document.getElementById('metTrades').textContent   = `${m.totalTrades||0} trades`;
+
+  const pnl = parseFloat(m.totalPnl||0);
+  const pe  = document.getElementById('metPnl');
+  pe.textContent = pnl.toFixed(2);
+  pe.className   = 'metric-value ' + (pnl >= 0 ? 'pos' : 'neg');
+  const todayPnl = parseFloat(m.todayPnl||0);
+  document.getElementById('metTodayPnl').textContent = `Today: ${todayPnl>=0?'+':''}${todayPnl.toFixed(2)}`;
 
   // Config
   const cfg = state.config || {};
-  document.getElementById('cfgLeverage').textContent = `${cfg.leverage || '?'}x`;
-  document.getElementById('cfgRisk').textContent = cfg.riskPerTrade ? `${(cfg.riskPerTrade * 100).toFixed(1)}%` : '—';
-  document.getElementById('cfgTP').textContent = cfg.takeProfitPct ? `${(cfg.takeProfitPct * 100).toFixed(1)}%` : '—';
-  document.getElementById('cfgSL').textContent = cfg.stopLossPct ? `${(cfg.stopLossPct * 100).toFixed(1)}%` : '—';
+  document.getElementById('cfgLev').textContent    = cfg.leverage ? `${cfg.leverage}x` : '—';
+  document.getElementById('cfgRisk').textContent   = cfg.riskPerTrade ? `${(cfg.riskPerTrade*100).toFixed(1)}%` : '—';
+  document.getElementById('cfgTP').textContent     = cfg.takeProfitPct ? `${(cfg.takeProfitPct*100).toFixed(1)}%` : '—';
+  document.getElementById('cfgSL').textContent     = cfg.stopLossPct ? `${(cfg.stopLossPct*100).toFixed(1)}%` : '—';
   document.getElementById('cfgMaxPos').textContent = cfg.maxPositions || '—';
   document.getElementById('cfgCycles').textContent = state.cycles || 0;
-  document.getElementById('cfgPairs').textContent = (cfg.pairs || []).join(', ') || '—';
 
-  // Cycles
   const fmt = ts => ts ? new Date(ts).toLocaleTimeString() : '—';
   document.getElementById('lastManage').textContent = fmt(state.lastManageCycle);
   document.getElementById('lastScreen').textContent = fmt(state.lastScreenCycle);
   document.getElementById('lessonsCount').textContent = state.lessonsCount || 0;
-  document.getElementById('memoryPairs').textContent = state.memoryPairs || 0;
+  document.getElementById('memoryPairs').textContent  = state.memoryPairs  || 0;
 
-  // Evolve
   const ev = state.evolve || {};
-  document.getElementById('evolveClosed').textContent = ev.totalClosed || 0;
-  document.getElementById('evolveReady').textContent = ev.canEvolve ? '✅ Yes' : 'No';
-  document.getElementById('evolveReady').style.color = ev.canEvolve ? 'var(--green)' : 'var(--text3)';
-  document.getElementById('evolveWR').textContent = (ev.winRate || '0') + '%';
-  document.getElementById('evolveAvgPnl').textContent = ev.avgPnl || '0.00';
+  document.getElementById('evClosed').textContent = ev.totalClosed || 0;
+  const evReady = document.getElementById('evReady');
+  evReady.textContent = ev.canEvolve ? '✅ YES' : 'NO';
+  evReady.style.color = ev.canEvolve ? 'var(--green)' : 'var(--text3)';
+  document.getElementById('evWR').textContent  = (ev.winRate||'0') + '%';
+  document.getElementById('evAvg').textContent = ev.avgPnl || '0.00';
+
+  renderPositions(state.openPositions||[]);
+  updateTicker(state.config?.pairs||[]);
 }
 
 function renderPositions(positions) {
   const el = document.getElementById('positionsList');
-  if (!positions.length) {
-    el.innerHTML = `<div class="empty"><div class="empty-icon">📭</div>No open positions</div>`;
-    return;
-  }
+  if (!positions.length) { el.innerHTML = '<div class="empty"><div class="empty-icon">📭</div>No open positions</div>'; return; }
   el.innerHTML = positions.map(p => {
     const side = parseFloat(p.positionAmt) > 0 ? 'LONG' : 'SHORT';
-    const pnl = parseFloat(p.unRealizedProfit || 0);
-    const posClass = pnl >= 0 ? 'pos' : 'neg';
-    return `<div class="position-card">
-      <div>
-        <div class="pos-symbol">${p.symbol}</div>
-        <div style="font-family:var(--mono);font-size:11px;color:var(--text3);margin-top:3px">
-          Entry: ${parseFloat(p.entryPrice).toFixed(2)}
+    const pnl  = parseFloat(p.unRealizedProfit||0);
+    return `<div class="pos-card">
+      <div><div class="pos-sym">${p.symbol}</div><div class="pos-entry">Entry: ${parseFloat(p.entryPrice).toFixed(2)}</div></div>
+      <span class="pos-side ${side.toLowerCase()}">${side}</span>
+      <div><div class="pos-pnl ${pnl>=0?'pos':'neg'}">${pnl>=0?'+':''}${pnl.toFixed(2)}</div><div style="font-family:var(--mono);font-size:9px;color:var(--text3);text-align:right">USDT</div></div>
+    </div>`;
+  }).join('');
+}
+
+function updateTicker(pairs) {
+  const syms = ['BTCUSDT','ETHUSDT','BNBUSDT','SOLUSDT','XRPUSDT'];
+  // just keep ticking — prices updated via ticker fetch
+}
+
+// ── Log terminal ──────────────────────────────────────────────────────────────
+function appendLog(level, mod, msg) {
+  const term = document.getElementById('logTerm');
+  // Remove cursor first
+  const cursor = term.querySelector('.log-cursor');
+  if (cursor) cursor.remove();
+
+  const now = new Date().toLocaleTimeString('en-GB', {hour12:false});
+  const div = document.createElement('div');
+  div.className = 'log-row';
+  div.innerHTML = `<span class="log-ts">${now}</span><span class="log-lv ${level}">${level}</span><span class="log-mod">[${mod}]</span><span class="log-msg">${esc(msg)}</span>`;
+  term.appendChild(div);
+  logCount++;
+  if (logCount > MAX_LOGS && term.firstChild) term.removeChild(term.firstChild);
+
+  // Re-add cursor
+  const cur = document.createElement('span');
+  cur.className = 'log-cursor';
+  term.appendChild(cur);
+  term.scrollTop = term.scrollHeight;
+}
+
+function clearLog() {
+  document.getElementById('logTerm').innerHTML = '<span class="log-cursor"></span>';
+  logCount = 0;
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── Radar ─────────────────────────────────────────────────────────────────────
+async function loadRadar() {
+  try {
+    const r    = await fetch(`${API}/api/radar`);
+    const data = await r.json();
+    renderRadar(data);
+  } catch (_) {}
+}
+
+function renderRadar(items) {
+  const grid  = document.getElementById('radarGrid');
+  const badge = document.getElementById('radarBadge');
+  const ts    = document.getElementById('radarTs');
+
+  badge.textContent = `${items.length} signal${items.length !== 1 ? 's' : ''}`;
+
+  if (!items.length) {
+    grid.innerHTML = `<div class="radar-empty">
+      <div style="font-size:28px;margin-bottom:8px;opacity:.25">📡</div>
+      NO SIGNALS — Belum ada pair dengan ≥4/6 sinyal aktif
+    </div>`;
+    return;
+  }
+
+  ts.textContent = items[0]?.updatedAt ? new Date(items[0].updatedAt).toLocaleTimeString() : '';
+
+  grid.innerHTML = items.map(item => {
+    const isLong  = item.side === 'LONG';
+    const sc      = item.score;
+    const scClass = sc >= 6 ? 's6' : sc >= 5 ? 's5' : 's4';
+    const fillPct = (sc / 6 * 100).toFixed(0);
+
+    const sigRows = (item.signals||[]).map(s =>
+      `<div class="rc-sig ${s.hit ? 'hit' : 'miss'}">
+        <div class="rc-sig-dot"></div>
+        <span>${s.name}</span>
+      </div>`
+    ).join('');
+
+    const chg      = parseFloat(item.change24h||0);
+    const chgColor = chg >= 0 ? 'var(--green)' : 'var(--red)';
+
+    return `<div class="radar-card ${isLong ? 'long' : 'short'}">
+      <div class="radar-card-glow"></div>
+      <div class="rc-top">
+        <div>
+          <div class="rc-sym">${item.symbol}</div>
+          <div class="rc-price">${item.price ? parseFloat(item.price).toLocaleString() : '—'}</div>
         </div>
+        <span class="rc-side ${isLong ? 'long' : 'short'}">${item.side}</span>
       </div>
-      <div>
-        <span class="pos-side ${side.toLowerCase()}">${side}</span>
+      <div class="rc-score-row">
+        <span class="rc-score-num ${scClass}">${sc}/6</span>
+        <div class="rc-score-track"><div class="rc-score-fill" style="width:${fillPct}%"></div></div>
       </div>
-      <div>
-        <div class="pos-pnl ${posClass}">${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}</div>
-        <div style="font-family:var(--mono);font-size:10px;color:var(--text3);text-align:right">USDT</div>
+      <div class="rc-sigs">${sigRows}</div>
+      <div class="rc-footer">
+        <span style="color:${chgColor}">${chg>=0?'+':''}${chg.toFixed(2)}%</span>
+        <span>RSI: ${item.rsi1h||'—'}</span>
+        <span>${item.fundingRate ? 'F:'+item.fundingRate+'%' : ''}</span>
       </div>
     </div>`;
   }).join('');
 }
 
-// ── Log terminal ──────────────────────────────────────────────────────────────
-
-function appendLog(level, mod, msg) {
-  const terminal = document.getElementById('logTerminal');
-  const now = new Date().toLocaleTimeString();
-  const div = document.createElement('div');
-  div.className = 'log-entry';
-  div.innerHTML = `<span class="log-ts">${now}</span><span class="log-level ${level}">${level}</span><span class="log-mod">[${mod}]</span><span class="log-msg">${escHtml(msg)}</span>`;
-  terminal.appendChild(div);
-  logCount++;
-  // Remove old entries if over limit
-  if (logCount > MAX_LOGS) {
-    terminal.firstChild && terminal.removeChild(terminal.firstChild);
-  }
-  terminal.scrollTop = terminal.scrollHeight;
-}
-
-function clearLog() {
-  document.getElementById('logTerminal').innerHTML = '';
-  logCount = 0;
-}
-
-function escHtml(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
-
 // ── Actions ───────────────────────────────────────────────────────────────────
-
 async function startAgent() {
   try {
-    const r = await fetch(`${API}/api/start`, {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ mode: currentMode })
-    });
+    const r = await fetch(`${API}/api/start`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({mode:currentMode}) });
     const d = await r.json();
-    if (d.ok) toast('Agent started in ' + currentMode + ' mode', 'success');
-    else toast(d.error, 'error');
-  } catch (e) { toast('Connection error', 'error'); }
+    d.ok ? toast('Agent started — ' + currentMode, 'success') : toast(d.error, 'error');
+  } catch { toast('Connection error', 'error'); }
 }
 
 async function stopAgent() {
   try {
-    const r = await fetch(`${API}/api/stop`, { method: 'POST' });
+    const r = await fetch(`${API}/api/stop`, { method:'POST' });
     const d = await r.json();
-    if (d.ok) toast('Agent stopped', 'success');
-    else toast(d.error, 'error');
-  } catch (e) { toast('Connection error', 'error'); }
+    d.ok ? toast('Agent stopped', 'success') : toast(d.error, 'error');
+  } catch { toast('Connection error', 'error'); }
 }
 
 async function setMode(mode) {
-  if (mode === 'live') {
-    if (!confirm('⚠️ Switch to LIVE mode? Real money will be traded!')) return;
-  }
+  if (mode === 'live' && !confirm('⚠ Switch to LIVE mode? Real money will be traded!')) return;
   try {
-    const r = await fetch(`${API}/api/mode`, {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ mode })
-    });
+    const r = await fetch(`${API}/api/mode`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({mode}) });
     const d = await r.json();
-    if (d.ok) toast('Mode changed to ' + mode, 'success');
-    else toast(d.error || 'Failed', 'error');
-  } catch (e) { toast('Connection error', 'error'); }
+    d.ok ? toast('Mode: ' + mode, 'success') : toast(d.error, 'error');
+  } catch { toast('Connection error', 'error'); }
 }
 
 async function runEvolve() {
-  toast('Running threshold evolution...', '');
+  toast('Running evolve...', 'warn');
   try {
-    const r = await fetch(`${API}/api/evolve`, { method: 'POST' });
+    const r = await fetch(`${API}/api/evolve`, { method:'POST' });
     const d = await r.json();
-    if (d.ok) toast('Evolution complete!', 'success');
-    else toast(d.error || 'Failed', 'error');
-  } catch (e) { toast('Connection error', 'error'); }
+    d.ok ? toast('Evolve complete!', 'success') : toast(d.error, 'error');
+  } catch { toast('Connection error', 'error'); }
 }
 
 async function runLearn() {
-  toast('Generating lessons from trade history...', '');
+  toast('Generating lessons...', 'warn');
   try {
-    const r = await fetch(`${API}/api/learn`, { method: 'POST' });
+    const r = await fetch(`${API}/api/learn`, { method:'POST' });
     const d = await r.json();
-    if (d.ok) toast(`Generated ${d.count || 0} lessons!`, 'success');
-    else toast(d.error || 'Failed', 'error');
-  } catch (e) { toast('Connection error', 'error'); }
+    d.ok ? toast(`Generated ${d.count||0} lessons`, 'success') : toast(d.error, 'error');
+  } catch { toast('Connection error', 'error'); }
 }
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
-
-async function switchTab(tab) {
+function switchTab(tab) {
   ['lessons','memory','history'].forEach(t => {
-    document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1)).className = 'tab' + (t === tab ? ' active' : '');
-    document.getElementById('content' + t.charAt(0).toUpperCase() + t.slice(1)).className = 'tab-content' + (t === tab ? ' active' : '') + ' scroll-panel';
-    document.getElementById('content' + t.charAt(0).toUpperCase() + t.slice(1)).style.maxHeight = '400px';
+    const T = t.charAt(0).toUpperCase()+t.slice(1);
+    document.getElementById('tab'+T).className    = 'tab' + (t===tab?' active':'');
+    document.getElementById('content'+T).className = 'tab-content' + (t===tab?' active':'');
   });
-
-  if (tab === 'lessons') loadLessons();
-  if (tab === 'memory') loadMemory();
-  if (tab === 'history') loadHistory();
+  if (tab==='lessons') loadLessons();
+  if (tab==='memory')  loadMemory();
+  if (tab==='history') loadHistory();
 }
 
 async function loadLessons() {
@@ -1156,15 +1440,15 @@ async function loadLessons() {
     const lessons = await r.json();
     const list = document.getElementById('lessonsList');
     const empty = document.getElementById('lessonsEmpty');
-    if (!lessons.length) { empty.style.display = ''; list.innerHTML = ''; return; }
-    empty.style.display = 'none';
+    if (!lessons.length) { empty.style.display=''; list.innerHTML=''; return; }
+    empty.style.display='none';
     list.innerHTML = lessons.slice().reverse().map(l =>
       `<div class="lesson-item">
-        <div class="lesson-meta">[${l.pair || 'GENERAL'}] [${l.direction || 'ANY'}] ${l.confidence || 'medium'}</div>
-        ${escHtml(l.insight)}
+        <div class="lesson-meta">[${l.pair||'GENERAL'}] [${l.direction||'ANY'}] ${l.confidence||'medium'}</div>
+        ${esc(l.insight||'')}
       </div>`
     ).join('');
-  } catch (_) {}
+  } catch {}
 }
 
 async function loadMemory() {
@@ -1174,27 +1458,19 @@ async function loadMemory() {
     const pairs = Object.values(mem);
     const tbody = document.getElementById('memoryBody');
     const empty = document.getElementById('memoryEmpty');
-    if (!pairs.length) { empty.style.display = ''; tbody.innerHTML = ''; return; }
-    empty.style.display = 'none';
-    const sorted = pairs.sort((a,b) => (b.score||50)-(a.score||50));
-    tbody.innerHTML = sorted.map(p => {
-      const score = p.score || 50;
-      const color = score > 60 ? 'var(--green)' : score < 40 ? 'var(--red)' : 'var(--yellow)';
+    if (!pairs.length) { empty.style.display=''; tbody.innerHTML=''; return; }
+    empty.style.display='none';
+    tbody.innerHTML = pairs.sort((a,b)=>(b.score||0)-(a.score||0)).map(p => {
+      const sc = p.score||50;
+      const color = sc>60 ? 'var(--green)' : sc<40 ? 'var(--red)' : 'var(--yellow)';
       return `<tr>
-        <td style="color:var(--accent);font-weight:700">${p.symbol}</td>
-        <td>
-          <div class="score-bar">
-            <span style="color:${color};font-size:12px">${score.toFixed(0)}</span>
-            <div class="score-track">
-              <div class="score-fill" style="width:${score}%;background:${color}"></div>
-            </div>
-          </div>
-        </td>
+        <td style="color:var(--accent);font-family:var(--head);font-size:12px">${p.symbol}</td>
+        <td><div class="score-bar"><span style="color:${color};font-size:11px">${sc.toFixed(0)}</span><div class="score-track"><div class="score-fill" style="width:${sc}%;background:${color}"></div></div></div></td>
         <td style="color:${parseFloat(p.winRate||0)>=50?'var(--green)':'var(--red)'}">${(p.winRate||0).toFixed(0)}%</td>
         <td>${p.totalTrades||0}</td>
       </tr>`;
     }).join('');
-  } catch (_) {}
+  } catch {}
 }
 
 async function loadHistory() {
@@ -1202,47 +1478,197 @@ async function loadHistory() {
     const r = await fetch(`${API}/api/history`);
     const history = await r.json();
     const el = document.getElementById('historyList');
-    if (!history.length) {
-      el.innerHTML = `<div class="empty"><div class="empty-icon">📊</div>No trade history yet</div>`;
-      return;
-    }
+    if (!history.length) { el.innerHTML='<div class="empty"><div class="empty-icon">📊</div>No history yet</div>'; return; }
     el.innerHTML = history.slice().reverse().map(t => {
-      const pnl = parseFloat(t.pnl || 0);
-      const pos = pnl >= 0;
-      return `<div style="padding:10px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+      const pnl = parseFloat(t.pnl||0);
+      return `<div class="hist-row">
         <div>
-          <div style="font-family:var(--mono);font-size:13px;color:var(--text)">${t.symbol} <span style="color:${t.side==='LONG'?'var(--green)':'var(--red)'};font-size:11px">${t.side}</span></div>
-          <div style="font-size:11px;color:var(--text3);margin-top:2px">${t.closeReason || ''} · ${t.closedAt ? new Date(t.closedAt).toLocaleDateString() : ''}</div>
+          <div class="hist-sym" style="font-family:var(--head)">${t.symbol} <span style="color:${t.side==='LONG'?'var(--green)':'var(--red)'};font-size:10px">${t.side}${t.isPaper?' [P]':''}</span></div>
+          <div class="hist-meta">${t.closeReason||''} · ${t.closedAt?new Date(t.closedAt).toLocaleDateString():''}</div>
         </div>
-        <div style="font-family:var(--mono);font-size:14px;color:${pos?'var(--green)':'var(--red)'};font-weight:700">${pos?'+':''}${pnl.toFixed(2)}</div>
+        <div class="hist-pnl" style="color:${pnl>=0?'var(--green)':'var(--red)'}">${pnl>=0?'+':''}${pnl.toFixed(2)}</div>
       </div>`;
     }).join('');
-  } catch (_) {}
+  } catch {}
 }
 
 // ── Toast ─────────────────────────────────────────────────────────────────────
-
-let toastTimer = null;
-function toast(msg, type) {
+let toastTimer;
+function toast(msg, type='') {
   const el = document.getElementById('toast');
-  el.textContent = msg;
-  el.className = 'show ' + (type || '');
+  el.textContent = msg; el.className = 'show ' + type;
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => el.className = '', 3000);
 }
 
-// ── Initial load ──────────────────────────────────────────────────────────────
 
-fetch(`${API}/api/state`).then(r => r.json()).then(updateState).catch(() => {});
+
+// ── Settings ──────────────────────────────────────────────────────────────────
+
+let _settingsCache = {};
+
+async function openSettings() {
+  try {
+    const r = await fetch(`${API}/api/settings`);
+    _settingsCache = await r.json();
+    populateSettings(_settingsCache);
+    document.getElementById('settingsOverlay').classList.add('open');
+  } catch (e) { toast('Gagal load settings: ' + e.message, 'error'); }
+}
+
+function closeSettings() {
+  document.getElementById('settingsOverlay').classList.remove('open');
+  hideSaveMsg();
+}
+
+function closeSettingsOutside(e) {
+  if (e.target === document.getElementById('settingsOverlay')) closeSettings();
+}
+
+function populateSettings(s) {
+  // Numeric ranges
+  setRange('leverage',              s.leverage,              'x');
+  setRange('riskPerTrade',          s.riskPerTrade,          '%', 100);
+  setRange('takeProfitPct',         s.takeProfitPct,         '%', 100);
+  setRange('stopLossPct',           s.stopLossPct,           '%', 100);
+  setRange('managementIntervalMin', s.managementIntervalMin, ' min');
+  setRange('screeningIntervalMin',  s.screeningIntervalMin,  ' min');
+
+  // Number inputs
+  setVal('maxPositions',   s.maxPositions);
+  setVal('evolveMinTrades',s.evolveMinTrades);
+
+  // Text inputs
+  setVal('openRouterModel', s.openRouterModel || '');
+  setVal('ollamaBaseUrl',   s.ollamaBaseUrl   || 'http://localhost:11434');
+  setVal('pairs',           s.pairs           || '');
+  setVal('pairsBlacklist',  s.pairsBlacklist  || '');
+
+  // Toggles
+  setChk('autoPairs',    s.autoPairs);
+  setChk('ollamaMode',   s.ollamaMode);
+  setChk('trailingStop', s.trailingStop);
+
+  toggleAutoPairs(s.autoPairs);
+  toggleOllama(s.ollamaMode);
+}
+
+function setRange(id, val, suffix, mult) {
+  const el = document.getElementById('s_' + id);
+  if (!el) return;
+  el.value = val;
+  rangeVal(id, val, suffix, mult);
+}
+
+function setVal(id, val) {
+  const el = document.getElementById('s_' + id);
+  if (el) el.value = val;
+}
+
+function setChk(id, val) {
+  const el = document.getElementById('s_' + id);
+  if (el) el.checked = !!val;
+}
+
+function rangeVal(id, val, suffix, mult) {
+  const el = document.getElementById('s_' + id + '_val');
+  if (!el) return;
+  const n = parseFloat(val);
+  el.textContent = mult ? (n * mult).toFixed(mult === 100 ? 1 : 0) + suffix : n + suffix;
+}
+
+function toggleAutoPairs(checked) {
+  const sec = document.getElementById('s_manualPairsSection');
+  if (sec) sec.style.opacity = checked ? '.4' : '1';
+  const inp = document.getElementById('s_pairs');
+  if (inp) inp.disabled = !!checked;
+}
+
+function toggleOllama(checked) {
+  const urlField = document.getElementById('s_ollamaUrlField');
+  if (urlField) urlField.style.opacity = checked ? '1' : '.4';
+  const modelInp = document.getElementById('s_openRouterModel');
+  if (modelInp) {
+    if (checked && modelInp.value.includes('/')) modelInp.placeholder = 'qwen3';
+    else modelInp.placeholder = 'anthropic/claude-3-haiku';
+  }
+}
+
+async function saveSettings() {
+  const body = {
+    leverage:              getInputVal('leverage'),
+    riskPerTrade:          getInputVal('riskPerTrade'),
+    takeProfitPct:         getInputVal('takeProfitPct'),
+    stopLossPct:           getInputVal('stopLossPct'),
+    maxPositions:          getInputVal('maxPositions'),
+    managementIntervalMin: getInputVal('managementIntervalMin'),
+    screeningIntervalMin:  getInputVal('screeningIntervalMin'),
+    evolveMinTrades:       getInputVal('evolveMinTrades'),
+    trailingStop:          document.getElementById('s_trailingStop').checked,
+    autoPairs:             document.getElementById('s_autoPairs').checked,
+    ollamaMode:            document.getElementById('s_ollamaMode').checked,
+    openRouterModel:       document.getElementById('s_openRouterModel').value.trim(),
+    ollamaBaseUrl:         document.getElementById('s_ollamaBaseUrl').value.trim(),
+    pairs:                 document.getElementById('s_pairs').value.trim(),
+    pairsBlacklist:        document.getElementById('s_pairsBlacklist').value.trim(),
+  };
+
+  try {
+    const r = await fetch(`${API}/api/settings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const d = await r.json();
+
+    if (d.ok) {
+      showSaveMsg('✓ Saved & applied — restart agent to activate interval changes', 'ok');
+      toast('Settings saved!', 'success');
+      // Close after 1.5s
+      setTimeout(closeSettings, 1500);
+    } else {
+      const errs = d.errors ? d.errors.join(' | ') : (d.error || 'Unknown error');
+      showSaveMsg('✗ ' + errs, 'err');
+      toast('Validation error', 'error');
+    }
+  } catch (e) {
+    showSaveMsg('✗ ' + e.message, 'err');
+    toast('Connection error', 'error');
+  }
+}
+
+function getInputVal(id) {
+  const el = document.getElementById('s_' + id);
+  return el ? el.value : undefined;
+}
+
+function showSaveMsg(msg, cls) {
+  const el = document.getElementById('saveMsg');
+  el.textContent = msg; el.className = 'save-msg show ' + cls;
+}
+
+function hideSaveMsg() {
+  document.getElementById('saveMsg').className = 'save-msg';
+}
+
+// Close modal on Escape key
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeSettings();
+});
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+fetch(`${API}/api/state`).then(r=>r.json()).then(updateState).catch(()=>{});
+loadRadar();
 connectWS();
 
-// Periodic refresh for lessons count
+// Periodic refresh
 setInterval(() => {
+  loadRadar();
   const active = document.querySelector('.tab.active')?.id;
-  if (active === 'tabMemory') loadMemory();
-  if (active === 'tabLessons') loadLessons();
-  if (active === 'tabHistory') loadHistory();
-}, 30000);
+  if (active==='tabMemory')  loadMemory();
+  if (active==='tabLessons') loadLessons();
+  if (active==='tabHistory') loadHistory();
+}, 60000);
 </script>
 </body>
 </html>
