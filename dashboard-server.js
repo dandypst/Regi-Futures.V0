@@ -82,6 +82,11 @@ function getFullState() {
 
 let _handlers = {};
 
+// Broadcast state update ke semua WS client — dipanggil dari luar (misal setelah loadPairs)
+export function broadcastState() {
+  broadcast({ type: 'state', data: getFullState() });
+}
+
 export function initDashboard(handlers) {
   _handlers = handlers;
   const PORT = config.dashboardPort || 3000;
