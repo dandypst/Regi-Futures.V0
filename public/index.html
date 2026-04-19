@@ -605,6 +605,22 @@
   .ws-dot.connected { background: var(--green); box-shadow: 0 0 6px var(--green); }
   .ws-dot.disconnected { background: var(--red); }
 
+  /* Proxy indicator */
+  .proxy-pill {
+    display: flex; align-items: center; gap: 6px;
+    padding: 5px 12px; border-radius: 100px;
+    background: var(--bg3); border: 1px solid var(--border);
+    font-family: var(--mono); font-size: 10px; letter-spacing: 1px;
+    cursor: default;
+  }
+  .proxy-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--text3); transition: all 0.3s;
+  }
+  .proxy-dot.active   { background: var(--yellow); box-shadow: 0 0 6px var(--yellow); animation: pulse 2s infinite; }
+  .proxy-dot.standby  { background: var(--text3); }
+  .proxy-dot.none     { background: var(--text3); opacity: 0.4; }
+
   /* ── Divider ── */
   .divider { height: 1px; background: var(--border); margin: 12px 0; }
 
@@ -637,6 +653,11 @@
       <div class="ws-indicator">
         <div class="ws-dot" id="wsDot"></div>
         <span id="wsStatus">connecting</span>
+      </div>
+
+      <div class="proxy-pill" id="proxyPill" title="Status koneksi ke Binance">
+        <div class="proxy-dot none" id="proxyDot"></div>
+        <span id="proxyLabel">PROXY —</span>
       </div>
 
       <div class="mode-toggle">
@@ -917,6 +938,26 @@ function updateState(state) {
 
   isRunning = state.running;
   currentMode = state.mode || 'testnet';
+
+  // Proxy status
+  if (state.proxy) {
+    const dot   = document.getElementById('proxyDot');
+    const label = document.getElementById('proxyLabel');
+    const pill  = document.getElementById('proxyPill');
+    if (!state.proxy.configured) {
+      dot.className   = 'proxy-dot none';
+      label.textContent = 'PROXY —';
+      pill.title      = 'Proxy tidak dikonfigurasi';
+    } else if (state.proxy.active) {
+      dot.className   = 'proxy-dot active';
+      label.textContent = 'PROXY ON';
+      pill.title      = `Proxy aktif: ${state.proxy.proxyUrl}`;
+    } else {
+      dot.className   = 'proxy-dot standby';
+      label.textContent = 'PROXY STANDBY';
+      pill.title      = `Proxy standby: ${state.proxy.proxyUrl}`;
+    }
+  }
 
   // Agent status
   const dot = document.getElementById('agentDot');
