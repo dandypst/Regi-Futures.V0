@@ -875,13 +875,19 @@ header::after {
   }
   .dryrun-badge.live-mode {
     background: rgba(255,45,85,.1);
-    border-color: rgba(255,45,85,.3);
+    border-color: rgba(255,45,85,.4);
     color: var(--red);
-    animation: none;
+    animation: none;        /* tidak berkedip */
+    opacity: 1;
   }
   .dryrun-badge.live-mode:hover {
     background: rgba(255,45,85,.2);
     box-shadow: 0 0 12px rgba(255,45,85,.2);
+  }
+  /* Saat dry run OFF — dot indikator mati (solid, tidak pulse) */
+  #dryrunBadge.live-mode::before {
+    animation: none;
+    opacity: 1;
   }
 
   /* Trade notification popup */
@@ -1847,12 +1853,12 @@ function updateModeIndicator(cfg) {
       dryEl.style.display = 'flex';
       dryEl.className     = 'dryrun-badge';
       dryEl.title         = 'DRY RUN aktif — Klik untuk matikan (order ke Binance)';
-      dryEl.innerHTML     = '◉ DRY RUN';
+      dryEl.innerHTML     = '◉ DRY RUN';   // kuning berkedip
     } else {
       dryEl.style.display = 'flex';
       dryEl.className     = 'dryrun-badge live-mode';
       dryEl.title         = `Order NYATA ke Binance ${mode.toUpperCase()} — Klik untuk aktifkan Dry Run`;
-      dryEl.innerHTML     = `◉ ${mode.toUpperCase()} LIVE`;
+      dryEl.innerHTML     = `● ${mode.toUpperCase()} LIVE`;  // merah solid, tidak berkedip
     }
   }
 
