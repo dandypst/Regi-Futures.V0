@@ -183,6 +183,18 @@ app.get('/api/history', (_req, res) => {
   res.json(loadTradeHistory().slice(-50));
 });
 
+// Manual refresh balance
+app.post('/api/refresh-balance', async (_req, res) => {
+  if (!_handlers.onRefreshBalance) return res.status(500).json({ error: 'Handler tidak terdaftar' });
+  try {
+    await _handlers.onRefreshBalance();
+    broadcast({ type: 'state', data: getFullState() });
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
 // Manual close position dari dashboard
 app.post('/api/close', async (req, res) => {
   const { symbol, positionAmt } = req.body;
@@ -290,6 +302,18 @@ app.post('/api/settings', (req, res) => {
     logger.sys(MOD, `Settings updated: ${JSON.stringify(updates)}`);
     broadcast({ type: 'state', data: getFullState() });
     res.json({ ok: true, updated: updates });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// Manual refresh balance
+app.post('/api/refresh-balance', async (_req, res) => {
+  if (!_handlers.onRefreshBalance) return res.status(500).json({ error: 'Handler tidak terdaftar' });
+  try {
+    await _handlers.onRefreshBalance();
+    broadcast({ type: 'state', data: getFullState() });
+    res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ ok: false, error: e.message });
   }
