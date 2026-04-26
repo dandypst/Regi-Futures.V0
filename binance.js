@@ -59,11 +59,18 @@ function buildSignedQuery(params, secret) {
 // ── Smart Proxy Manager ───────────────────────────────────────────────────────
 
 const proxyState = {
-  useProxy:        false,
+  // Jika HTTPS_PROXY sudah diset → langsung aktifkan dari awal
+  // Tidak perlu tunggu 3x gagal
+  get useProxy() {
+    if (_forceProxy !== null) return _forceProxy;
+    return !!(process.env.HTTPS_PROXY || process.env.https_proxy);
+  },
+  set useProxy(val) { _forceProxy = val; },
   failCount:       0,
   lastRetryDirect: 0,
   RETRY_INTERVAL:  5 * 60 * 1000,
 };
+let _forceProxy = null;
 
 const BLOCK_SIGNATURES = [
   'iiniternetpositif', 'internetpositif', 'altnames',
