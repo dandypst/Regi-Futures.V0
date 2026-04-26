@@ -561,16 +561,18 @@ async function gatherMarketData(symbol) {
 export async function runScreeningAgent(pairs) {
   logger.ai(MOD, `Screening ${pairs.length} pairs dengan full indicator suite...`);
 
+  // Urutkan pairs berdasarkan pool-memory score (pair terbaik duluan)
+  // Semua pairs diproses, bukan hanya top 6
   const ranked   = rankPairs(pairs);
-  const topPairs = ranked.length > 0
-    ? ranked.slice(0, 6).map(r => r.symbol)
-    : pairs.slice(0, 6);
+  const allPairs = ranked.length > 0
+    ? ranked.map(r => r.symbol)          // semua pairs, diurutkan by score
+    : pairs;                              // fallback ke urutan asli
 
-  // Sequential processing — satu pair selesai dulu baru lanjut pair berikutnya
+  // Sequential processing — satu pair selesai dulu baru lanjut
   // Lebih lambat tapi tidak membebani proxy/rate-limit
-  logger.ai(MOD, `Fetching data untuk ${topPairs.length} pairs (sequential)...`);
+  logger.ai(MOD, `Fetching data untuk ${allPairs.length} pairs (sequential)...`);
   const marketDataAll = await sequential(
-    topPairs.map(s => async () => {
+    allPairs.map(s => async () => {
       try {
         logger.info(MOD, `Fetching ${s}...`);
         return await gatherMarketData(s);
