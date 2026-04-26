@@ -1,6 +1,7 @@
 // telegram.js — Telegram bot integration untuk RRL-Futures
 
 import TelegramBot from 'node-telegram-bot-api';
+import { HttpsProxyAgent } from 'https-proxy-agent';
 import { config } from './config.js';
 import { logger, onLog } from './logger.js';
 import { getState } from './state.js';
@@ -39,7 +40,17 @@ export function initTelegram() {
   }
 
   try {
-    bot = new TelegramBot(token, { polling: true });
+    // Gunakan proxy jika HTTPS_PROXY diset (untuk bypass blokir ISP)
+    const proxyUrl = process.env.HTTPS_PROXY || process.env.https_proxy;
+    const botOptions = { polling: true };
+
+    if (proxyUrl) {
+      const agent = new HttpsProxyAgent(proxyUrl);
+      botOptions.request = { agent };
+      logger.info(MOD, `Telegram pakai proxy: ${proxyUrl.replace(/:[^:@]+@/, ':***@')}`);
+    }
+
+    bot = new TelegramBot(token, botOptions);
   } catch (e) {
     logger.error(MOD, `Gagal start Telegram bot: ${e.message}`);
     return null;
