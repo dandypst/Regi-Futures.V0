@@ -25,14 +25,35 @@ let running = false;
 
 // ── Auto-load pairs dari Binance ──────────────────────────────────────────────
 
+// Pairs major yang tersedia di testnet Binance Futures
+const TESTNET_PAIRS = [
+  'BTCUSDT','ETHUSDT','BNBUSDT','XRPUSDT','SOLUSDT',
+  'ADAUSDT','DOGEUSDT','AVAXUSDT','DOTUSDT','MATICUSDT',
+  'LINKUSDT','LTCUSDT','UNIUSDT','ATOMUSDT','ETCUSDT',
+  'XLMUSDT','TRXUSDT','NEARUSDT','ALGOUSDT','FILUSDT',
+];
+
 async function loadPairs() {
   if (!config.autoPairs) {
     const pairs = config.pairs?.length ? config.pairs : ['BTCUSDT', 'ETHUSDT'];
     logger.info(MOD, `Pairs dari config: ${pairs.length} pairs`);
     return pairs;
   }
+
+  // Di testnet — gunakan daftar major pairs saja
+  // Testnet tidak support semua 500+ pairs live
+  if (config.mode === 'testnet') {
+    const blacklist = config.pairsBlacklist || [];
+    const filtered  = TESTNET_PAIRS.filter(p => !blacklist.includes(p));
+    config.pairs    = filtered;
+    logger.sys(MOD, `autoPairs testnet: ${filtered.length} major pairs`);
+    try { broadcastState(); } catch (_) {}
+    return filtered;
+  }
+
+  // Di live — fetch semua pairs dari Binance
   try {
-    logger.info(MOD, 'autoPairs — fetching semua pair dari Binance...');
+    logger.info(MOD, 'autoPairs live — fetching semua pair dari Binance...');
     const allPairs = await getAllFuturesPairs({
       quoteAsset: config.autoPairsQuote    || 'USDT',
       perpOnly:   config.autoPairsPerpOnly !== false,
@@ -43,9 +64,8 @@ async function loadPairs() {
     }
     const blacklist = config.pairsBlacklist || [];
     const filtered  = blacklist.length ? allPairs.filter(p => !blacklist.includes(p)) : allPairs;
-    config.pairs = filtered;
-    logger.sys(MOD, `autoPairs: ${filtered.length} pairs aktif`);
-    // Broadcast update ke dashboard agar jumlah pairs langsung terefleksi
+    config.pairs    = filtered;
+    logger.sys(MOD, `autoPairs live: ${filtered.length} pairs aktif`);
     try { broadcastState(); } catch (_) {}
     return filtered;
   } catch (e) {
