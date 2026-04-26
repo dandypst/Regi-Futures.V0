@@ -102,6 +102,22 @@ function recordPaperTrade(decision, marketData) {
 
 // ── Startup ───────────────────────────────────────────────────────────────────
 
+// ── Refresh balance dari Binance ─────────────────────────────────────────────
+async function refreshBalance() {
+  try {
+    const balances = await getBalance();
+    const usdt = balances.find(b => b.asset === 'USDT');
+    if (usdt) {
+      updateBalance({ USDT: parseFloat(usdt.availableBalance).toFixed(2) });
+      logger.info(MOD, `Balance USDT: ${usdt.availableBalance} (mode: ${config.mode})`);
+    } else {
+      logger.warn(MOD, 'Balance USDT tidak ditemukan di akun');
+    }
+  } catch (e) {
+    logger.warn(MOD, `Gagal fetch balance: ${e.message}`);
+  }
+}
+
 async function startup() {
   logger.sys(MOD, '╔══════════════════════════════════════╗');
   logger.sys(MOD, '║         RRL-Futures v1.0             ║');
@@ -131,6 +147,9 @@ async function startup() {
       const history = loadTradeHistory();
       return generateLessonsFromTrades(history.filter(t => t.closedAt));
     },
+    onRefreshBalance: async () => {
+      await refreshBalance();
+    },
     onClosePosition: async (symbol, posAmt) => {
       const positions = await syncPositions();
       const pos = positions.find(p => p.symbol === symbol);
@@ -147,16 +166,7 @@ async function startup() {
   const connected = await checkConnectivity();
   if (!connected) logger.warn(MOD, 'Binance connectivity gagal — cek API key & jaringan');
 
-  try {
-    const balances = await getBalance();
-    const usdt = balances.find(b => b.asset === 'USDT');
-    if (usdt) {
-      updateBalance({ USDT: parseFloat(usdt.availableBalance).toFixed(2) });
-      logger.info(MOD, `Balance USDT: ${usdt.availableBalance}`);
-    }
-  } catch (e) {
-    logger.warn(MOD, `Gagal fetch balance: ${e.message}`);
-  }
+  await refreshBalance();
 
   await loadPairs();
 
@@ -175,6 +185,9 @@ async function startAgent(mode) {
   config.mode = targetMode;
   running = true;
   setRunning(true, targetMode);
+
+  // Refresh balance setiap kali agent distart
+  await refreshBalance();
 
   await loadPairs();
 
@@ -205,13 +218,31 @@ function stopAgent() {
   send('🛑 *RRL-Futures dihentikan*');
 }
 
-function changeMode(mode) {
+async function changeMode(mode) {
   const wasRunning = running;
   if (wasRunning) stopAgent();
+
+  // Update mode di config
+  config.mode = mode;
   logger.sys(MOD, `Mode diubah → ${mode}`);
-  send(`🔄 Mode diubah ke \`${mode}\``);
+
+  // Cek konektivitas ke endpoint baru (testnet vs live punya base URL berbeda)
+  const connected = await checkConnectivity();
+  if (!connected) {
+    logger.warn(MOD, `Binance ${mode} tidak bisa diakses — cek API key & jaringan`);
+    send(`⚠️ Binance \`${mode}\` tidak bisa diakses — cek API key`);
+    return;
+  }
+
+  // Refresh balance dari akun yang sesuai mode
+  await refreshBalance();
+
+  // Reload pairs untuk mode baru
+  await loadPairs();
+
+  send(`🔄 Mode diubah ke \`${mode}\` | Balance diperbarui`);
+
   if (wasRunning) startAgent(mode);
-  else config.mode = mode;
 }
 
 // ── Management cycle ──────────────────────────────────────────────────────────
@@ -222,6 +253,9 @@ async function runManageCycle() {
   try {
     const positions = await syncPositions();
     bumpCycle('manage');
+
+    // Refresh balance setiap manage cycle
+    await refreshBalance();
 
     // Auto-evolve jika sudah cukup real trades
     const evSummary = getEvolveSummary();
