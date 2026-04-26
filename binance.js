@@ -1,45 +1,73 @@
 // binance.js — Binance Futures REST API wrapper
 // Smart proxy: auto-fallback ke proxy jika koneksi langsung diblokir ISP
-// Retry direct setiap 5 menit untuk kembali ke mode normal
+// Timestamp sync dari server Binance untuk fix signature error
 
 import axios from 'axios';
 import { createHmac } from 'crypto';
+import { HttpsProxyAgent } from 'https-proxy-agent';
 import { config, getBinanceConfig } from './config.js';
 import { logger } from './logger.js';
 
 const MOD = 'BINANCE';
 
+// ── Timestamp sync ────────────────────────────────────────────────────────────
+// Binance tolak request jika timestamp beda > 1000ms dari servernya
+// Kita sync offset sekali, lalu pakai untuk semua request berikutnya
+
+let _serverTimeOffset = 0; // selisih ms antara local dan Binance server
+let _lastSyncAt       = 0;
+const SYNC_INTERVAL   = 30 * 60 * 1000; // sync ulang setiap 30 menit
+
+async function syncServerTime() {
+  try {
+    const { ax } = buildAxiosClient(false);
+    const before  = Date.now();
+    const res     = await ax.get('/fapi/v1/time', { timeout: 5000 });
+    const after   = Date.now();
+    const latency = Math.round((after - before) / 2);
+    _serverTimeOffset = res.data.serverTime - (before + latency);
+    _lastSyncAt       = Date.now();
+    logger.info(MOD, `Server time synced, offset: ${_serverTimeOffset}ms`);
+  } catch (e) {
+    logger.warn(MOD, `Server time sync gagal: ${e.message} — pakai local time`);
+    _serverTimeOffset = 0;
+  }
+}
+
+function getTimestamp() {
+  // Auto re-sync jika sudah lama
+  if (Date.now() - _lastSyncAt > SYNC_INTERVAL) {
+    syncServerTime().catch(() => {});
+  }
+  return Date.now() + _serverTimeOffset;
+}
+
 // ── HMAC Signing ──────────────────────────────────────────────────────────────
 
-function sign(params, secret) {
-  const qs = new URLSearchParams(params).toString();
-  return createHmac('sha256', secret).update(qs).digest('hex');
+function sign(queryString, secret) {
+  return createHmac('sha256', secret).update(queryString).digest('hex');
+}
+
+// Build query string dengan urutan yang benar
+// Signature harus di AKHIR query string
+function buildSignedQuery(params, secret) {
+  const qs  = new URLSearchParams(params).toString();
+  const sig = sign(qs, secret);
+  return `${qs}&signature=${sig}`;
 }
 
 // ── Smart Proxy Manager ───────────────────────────────────────────────────────
-// Logika:
-// 1. Coba koneksi langsung (direct) terlebih dahulu
-// 2. Jika terdeteksi diblokir ISP (SSL error, iiniternetpositif) → aktifkan proxy
-// 3. Setiap 5 menit, coba direct lagi — jika berhasil, kembali ke direct mode
-// 4. Proxy tetap standby (tidak dimatikan), hanya diaktifkan kalau perlu
 
 const proxyState = {
-  useProxy:      false,
-  failCount:     0,
+  useProxy:        false,
+  failCount:       0,
   lastRetryDirect: 0,
-  RETRY_INTERVAL:  5 * 60 * 1000, // 5 menit
+  RETRY_INTERVAL:  5 * 60 * 1000,
 };
 
-// Kata kunci yang menandakan koneksi diblokir ISP Indonesia
 const BLOCK_SIGNATURES = [
-  'iiniternetpositif',
-  'internetpositif',
-  'altnames',
-  'CERT_',
-  'ERR_CERT',
-  'certificate',
-  'self signed',
-  'unable to verify',
+  'iiniternetpositif', 'internetpositif', 'altnames',
+  'CERT_', 'ERR_CERT', 'certificate', 'self signed', 'unable to verify',
 ];
 
 function isBlockedByISP(err) {
@@ -61,49 +89,41 @@ function parseProxy(proxyUrl) {
         },
       } : {}),
     };
-  } catch (_) {
-    return null;
-  }
+  } catch (_) { return null; }
 }
 
-function buildAxios(useProxy) {
+function buildAxiosClient(useProxy) {
   const cfg      = getBinanceConfig();
   const proxyUrl = process.env.HTTPS_PROXY || process.env.https_proxy || null;
 
   const axConfig = {
     baseURL:  cfg.baseUrl,
     headers:  { 'X-MBX-APIKEY': cfg.apiKey },
-    timeout:  process.env.HTTPS_PROXY ? 30000 : 12000, // lebih lama jika pakai proxy
-    proxy:    false, // default: matikan proxy env-var agar tidak auto-detect
+    timeout:  proxyUrl ? 30000 : 12000,
+    proxy:    false,
   };
 
   if (useProxy && proxyUrl) {
-    const parsed = parseProxy(proxyUrl);
-    if (parsed) {
-      axConfig.proxy = parsed;
-    } else {
-      logger.warn(MOD, `Proxy URL tidak valid: ${proxyUrl}`);
-    }
+    axConfig.httpsAgent = new HttpsProxyAgent(proxyUrl);
   }
 
   return { ax: axios.create(axConfig), cfg };
 }
 
-// Core request dengan smart fallback
+// Core smart request
 async function smartRequest(method, url, options = {}) {
   const proxyUrl = process.env.HTTPS_PROXY || process.env.https_proxy || null;
   const hasProxy = !!proxyUrl;
 
-  // ── Coba retry koneksi langsung (jika sedang di proxy mode) ──────────────
+  // Retry direct jika sedang di proxy mode
   if (proxyState.useProxy && hasProxy) {
     const now = Date.now();
     if (now - proxyState.lastRetryDirect > proxyState.RETRY_INTERVAL) {
       proxyState.lastRetryDirect = now;
-      logger.info(MOD, '🔁 Retry koneksi langsung (setiap 5 menit)...');
+      logger.info(MOD, '🔁 Retry koneksi langsung...');
       try {
-        const { ax } = buildAxios(false);
+        const { ax } = buildAxiosClient(false);
         const res = await ax.request({ method, url, ...options });
-        // Berhasil → kembali ke direct mode
         proxyState.useProxy  = false;
         proxyState.failCount = 0;
         logger.sys(MOD, '✅ Koneksi langsung pulih — kembali ke direct mode');
@@ -114,8 +134,7 @@ async function smartRequest(method, url, options = {}) {
     }
   }
 
-  // ── Request dengan mode aktif saat ini ───────────────────────────────────
-  const { ax } = buildAxios(proxyState.useProxy && hasProxy);
+  const { ax } = buildAxiosClient(proxyState.useProxy && hasProxy);
 
   try {
     const res = await ax.request({ method, url, ...options });
@@ -125,14 +144,12 @@ async function smartRequest(method, url, options = {}) {
   } catch (err) {
     const blocked = isBlockedByISP(err);
 
-    // Terdeteksi blokir ISP → aktifkan proxy otomatis
     if (blocked && hasProxy && !proxyState.useProxy) {
       proxyState.useProxy        = true;
       proxyState.failCount       = 0;
       proxyState.lastRetryDirect = Date.now();
       logger.warn(MOD, '🔀 Diblokir ISP → proxy diaktifkan otomatis');
-
-      const { ax: axProxy } = buildAxios(true);
+      const { ax: axProxy } = buildAxiosClient(true);
       try {
         const res = await axProxy.request({ method, url, ...options });
         logger.sys(MOD, '✅ Request berhasil via proxy');
@@ -143,13 +160,12 @@ async function smartRequest(method, url, options = {}) {
       }
     }
 
-    // Gagal berulang (bukan blokir) → aktifkan proxy sebagai precaution
     if (!blocked && !proxyState.useProxy) {
       proxyState.failCount++;
       if (proxyState.failCount >= 3 && hasProxy) {
         proxyState.useProxy        = true;
         proxyState.lastRetryDirect = Date.now();
-        logger.warn(MOD, `⚠️ ${proxyState.failCount}x gagal berturut-turut → proxy diaktifkan sebagai precaution`);
+        logger.warn(MOD, `⚠️ ${proxyState.failCount}x gagal → proxy diaktifkan`);
       }
     }
 
@@ -157,7 +173,6 @@ async function smartRequest(method, url, options = {}) {
   }
 }
 
-// Expose status proxy untuk dashboard
 export function getProxyStatus() {
   const proxyUrl = process.env.HTTPS_PROXY || process.env.https_proxy || null;
   return {
@@ -183,12 +198,14 @@ async function rawGet(path, params = {}) {
   }
 }
 
+// FIX: signature sekarang dibuild sebagai raw query string
+// bukan sebagai URLSearchParams object yang bisa berubah urutan
 async function signedGet(path, params = {}) {
-  const { cfg } = buildAxios(false);
-  const p = { ...params, timestamp: Date.now() };
-  p.signature = sign(p, cfg.apiSecret);
+  const cfg = getBinanceConfig();
+  const p   = { ...params, timestamp: getTimestamp() };
+  const signedQs = buildSignedQuery(p, cfg.apiSecret);
   try {
-    const res = await smartRequest('GET', path, { params: p });
+    const res = await smartRequest('GET', path, { params: Object.fromEntries(new URLSearchParams(signedQs)) });
     return res.data;
   } catch (e) {
     const msg = e.response?.data?.msg || e.message;
@@ -198,11 +215,11 @@ async function signedGet(path, params = {}) {
 }
 
 async function signedPost(path, params = {}) {
-  const { cfg } = buildAxios(false);
-  const p = { ...params, timestamp: Date.now() };
-  p.signature = sign(p, cfg.apiSecret);
+  const cfg = getBinanceConfig();
+  const p   = { ...params, timestamp: getTimestamp() };
+  const signedQs = buildSignedQuery(p, cfg.apiSecret);
   try {
-    const res = await smartRequest('POST', path, { params: p });
+    const res = await smartRequest('POST', path, { params: Object.fromEntries(new URLSearchParams(signedQs)) });
     return res.data;
   } catch (e) {
     const msg = e.response?.data?.msg || e.message;
@@ -212,11 +229,11 @@ async function signedPost(path, params = {}) {
 }
 
 async function signedDelete(path, params = {}) {
-  const { cfg } = buildAxios(false);
-  const p = { ...params, timestamp: Date.now() };
-  p.signature = sign(p, cfg.apiSecret);
+  const cfg = getBinanceConfig();
+  const p   = { ...params, timestamp: getTimestamp() };
+  const signedQs = buildSignedQuery(p, cfg.apiSecret);
   try {
-    const res = await smartRequest('DELETE', path, { params: p });
+    const res = await smartRequest('DELETE', path, { params: Object.fromEntries(new URLSearchParams(signedQs)) });
     return res.data;
   } catch (e) {
     const msg = e.response?.data?.msg || e.message;
@@ -234,12 +251,9 @@ export async function getExchangeInfo() {
 export async function getKlines(symbol, interval = '1h', limit = 100) {
   const data = await rawGet('/fapi/v1/klines', { symbol, interval, limit });
   return data.map(k => ({
-    time:   k[0],
-    open:   parseFloat(k[1]),
-    high:   parseFloat(k[2]),
-    low:    parseFloat(k[3]),
-    close:  parseFloat(k[4]),
-    volume: parseFloat(k[5]),
+    time:   k[0], open:   parseFloat(k[1]),
+    high:   parseFloat(k[2]), low:    parseFloat(k[3]),
+    close:  parseFloat(k[4]), volume: parseFloat(k[5]),
   }));
 }
 
@@ -330,9 +344,7 @@ export async function closePosition(symbol, positionAmt) {
   const qty  = Math.abs(parseFloat(positionAmt));
   const side = parseFloat(positionAmt) > 0 ? 'SELL' : 'BUY';
   return placeOrder({
-    symbol,
-    side,
-    type:       'MARKET',
+    symbol, side, type: 'MARKET',
     quantity:   qty.toFixed(3),
     reduceOnly: true,
   });
@@ -343,8 +355,10 @@ export async function closePosition(symbol, positionAmt) {
 export async function checkConnectivity() {
   try {
     await rawGet('/fapi/v1/ping');
+    // Sync server time setiap connectivity check
+    await syncServerTime();
     const proxy = getProxyStatus();
-    const via   = proxy.active ? ` (via proxy: ${proxy.proxyUrl})` : ' (direct)';
+    const via   = proxy.active ? ` (via proxy)` : ' (direct)';
     logger.info(MOD, `Binance ${getBinanceConfig().mode} connectivity OK${via}`);
     return true;
   } catch (e) {
@@ -392,14 +406,11 @@ export async function getSymbolPrecision(symbol) {
     const info = await getExchangeInfoCached();
     const sym  = info.symbols.find(s => s.symbol === symbol);
     if (!sym) return { qtyPrecision: 3, pricePrecision: 2, minQty: 0.001, minNotional: 5 };
-
     const lot      = sym.filters.find(f => f.filterType === 'LOT_SIZE')     || {};
     const notional = sym.filters.find(f => f.filterType === 'MIN_NOTIONAL') || {};
     const price    = sym.filters.find(f => f.filterType === 'PRICE_FILTER') || {};
-
     const stepSize = parseFloat(lot.stepSize   || '0.001');
     const tickSize = parseFloat(price.tickSize  || '0.01');
-
     return {
       qtyPrecision:   stepSize >= 1 ? 0 : Math.round(-Math.log10(stepSize)),
       pricePrecision: tickSize >= 1  ? 0 : Math.round(-Math.log10(tickSize)),
