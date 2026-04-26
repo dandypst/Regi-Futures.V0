@@ -999,10 +999,10 @@ header::after {
 
 <!-- Metrics -->
 <div class="metrics-row">
-  <div class="metric c-green">
-    <div class="metric-label">Balance USDT</div>
+  <div class="metric c-green" style="cursor:pointer" onclick="refreshBalance()" title="Klik untuk refresh balance">
+    <div class="metric-label">Balance USDT <span style="font-size:8px;color:var(--text3)">↻</span></div>
     <div class="metric-value pos" id="metBalance">—</div>
-    <div class="metric-sub">Available</div>
+    <div class="metric-sub">Available — klik untuk refresh</div>
   </div>
   <div class="metric c-accent">
     <div class="metric-label">Open Positions</div>
@@ -1919,6 +1919,19 @@ async function closePositionManual(symbol, posAmt) {
   } catch { toast('Connection error', 'error'); }
 }
 
+
+// ── Balance Refresh ───────────────────────────────────────────────────────────
+
+async function refreshBalance() {
+  try {
+    document.getElementById('metBalance').textContent = '...';
+    const r = await fetch(`${API}/api/refresh-balance`, { method: 'POST' });
+    const d = await r.json();
+    if (!d.ok) toast('Gagal refresh balance: ' + d.error, 'error');
+  } catch (e) {
+    toast('Connection error', 'error');
+  }
+}
 
 // ── Dry Run Toggle ────────────────────────────────────────────────────────────
 
