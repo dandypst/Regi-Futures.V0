@@ -18,6 +18,26 @@ import {
 
 const MOD = 'AGENT';
 
+// ── Request throttle ──────────────────────────────────────────────────────────
+// Mencegah terlalu banyak request bersamaan ke Binance via proxy
+// Proses pairs secara batch dengan delay antar batch
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// Jalankan array of async functions secara berurutan dengan delay
+async function sequential(fns, delayMs = 300) {
+  const results = [];
+  for (const fn of fns) {
+    try {
+      results.push(await fn());
+    } catch (e) {
+      results.push({ error: e.message });
+    }
+    if (delayMs > 0) await sleep(delayMs);
+  }
+  return results;
+}
+
 // ── Radar data — pairs dengan sinyal kuat, diupdate setiap screening cycle ────
 // Disimpan di memori, dibaca oleh dashboard-server.js via getRadarData()
 let _radarData = [];
@@ -425,14 +445,18 @@ function detectRegime(klines) {
 // ═══════════════════════════════════════════════════════════
 
 async function gatherMarketData(symbol) {
-  const [klines4h, klines1h, klines15m, ticker, funding, oi] = await Promise.all([
-    getKlines(symbol, '4h', 100).catch(() => []),
-    getKlines(symbol, '1h', 100).catch(() => []),
-    getKlines(symbol, '15m', 60).catch(() => []),  // untuk candle pattern & entry
-    getTicker(symbol).catch(() => null),
-    getFundingRate(symbol).catch(() => null),
-    getOpenInterest(symbol).catch(() => null),
-  ]);
+  // Sequential fetch dengan delay kecil antar request
+  // Mencegah proxy/rate-limit timeout saat banyak pairs diproses
+  const klines4h  = await getKlines(symbol, '4h', 100).catch(() => []);
+  await sleep(150);
+  const klines1h  = await getKlines(symbol, '1h', 100).catch(() => []);
+  await sleep(150);
+  const klines15m = await getKlines(symbol, '15m', 60).catch(() => []);
+  await sleep(100);
+  const ticker    = await getTicker(symbol).catch(() => null);
+  await sleep(100);
+  const funding   = await getFundingRate(symbol).catch(() => null);
+  const oi        = await getOpenInterest(symbol).catch(() => null);
 
   const c1h  = klines1h.map(k => k.close);
   const c4h  = klines4h.map(k => k.close);
@@ -537,11 +561,20 @@ export async function runScreeningAgent(pairs) {
     ? ranked.slice(0, 6).map(r => r.symbol)
     : pairs.slice(0, 6);
 
-  const marketDataAll = await Promise.all(
-    topPairs.map(s => gatherMarketData(s).catch(e => {
-      logger.warn(MOD, `Data gagal untuk ${s}: ${e.message}`);
-      return { symbol: s, error: e.message };
-    }))
+  // Sequential processing — satu pair selesai dulu baru lanjut pair berikutnya
+  // Lebih lambat tapi tidak membebani proxy/rate-limit
+  logger.ai(MOD, `Fetching data untuk ${topPairs.length} pairs (sequential)...`);
+  const marketDataAll = await sequential(
+    topPairs.map(s => async () => {
+      try {
+        logger.info(MOD, `Fetching ${s}...`);
+        return await gatherMarketData(s);
+      } catch (e) {
+        logger.warn(MOD, `Data gagal untuk ${s}: ${e.message}`);
+        return { symbol: s, error: e.message };
+      }
+    }),
+    500  // 500ms delay antar pair
   );
 
   const valid = marketDataAll.filter(d => !d.error && d.price);
@@ -644,11 +677,12 @@ export async function runManagementAgent(positions) {
 
   logger.ai(MOD, `Managing ${positions.length} positions...`);
 
-  const positionData = await Promise.all(
-    positions.map(async p => ({
+  const positionData = await sequential(
+    positions.map(p => async () => ({
       ...p,
       market: await gatherMarketData(p.symbol).catch(() => ({})),
-    }))
+    })),
+    500
   );
 
   const lessonsCtx = getLessonsContext();
