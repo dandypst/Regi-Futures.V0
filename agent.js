@@ -825,6 +825,23 @@ async function callAI(prompt, type) {
 
     } else {
       // ── OpenRouter /v1/chat/completions ──────────────────
+      const proxyUrl = process.env.HTTPS_PROXY || process.env.https_proxy;
+      const orConfig = {
+        headers: {
+          'Authorization': `Bearer ${config.openRouterApiKey}`,
+          'Content-Type':  'application/json',
+          'HTTP-Referer':  'https://github.com/rrl-futures',
+          'X-Title':       'RRL-Futures',
+        },
+        timeout:      60000,
+        maxRedirects: 5,       // FIX: batasi redirect, jangan infinite loop
+        proxy:        false,   // matikan proxy bawaan axios
+      };
+      // Pakai httpsAgent jika proxy diset
+      if (proxyUrl) {
+        const { HttpsProxyAgent } = await import('https-proxy-agent');
+        orConfig.httpsAgent = new HttpsProxyAgent(proxyUrl);
+      }
       const res = await axios.post(
         ai.url,
         {
@@ -832,15 +849,7 @@ async function callAI(prompt, type) {
           max_tokens: 600,
           messages:   [{ role: 'user', content: prompt }],
         },
-        {
-          headers: {
-            'Authorization': `Bearer ${config.openRouterApiKey}`,
-            'Content-Type':  'application/json',
-            'HTTP-Referer':  'https://github.com/rrl-futures',
-            'X-Title':       'RRL-Futures',
-          },
-          timeout: 30000,
-        }
+        orConfig
       );
       raw = res.data.choices[0].message.content.trim();
       logger.ai(MOD, `OpenRouter (${ai.model}) responded`);
@@ -976,18 +985,26 @@ Be concise. Reply in the same language as the user.`,
   const messages = [sysMsg, ...chatHistory, { role: 'user', content: userMessage }];
 
   try {
+    const proxyUrl = process.env.HTTPS_PROXY || process.env.https_proxy;
+    const chatCfg  = {
+      headers: {
+        'Authorization': `Bearer ${config.openRouterApiKey}`,
+        'Content-Type':  'application/json',
+        'HTTP-Referer':  'https://github.com/rrl-futures',
+        'X-Title':       'RRL-Futures',
+      },
+      timeout:      60000,
+      maxRedirects: 5,
+      proxy:        false,
+    };
+    if (proxyUrl) {
+      const { HttpsProxyAgent } = await import('https-proxy-agent');
+      chatCfg.httpsAgent = new HttpsProxyAgent(proxyUrl);
+    }
     const res = await axios.post(
       'https://openrouter.ai/api/v1/chat/completions',
       { model: config.openRouterModel || 'anthropic/claude-3-haiku', max_tokens: 500, messages },
-      {
-        headers: {
-          'Authorization': `Bearer ${config.openRouterApiKey}`,
-          'Content-Type':  'application/json',
-          'HTTP-Referer':  'https://github.com/rrl-futures',
-          'X-Title':       'RRL-Futures',
-        },
-        timeout: 20000,
-      }
+      chatCfg
     );
 
     const reply = res.data.choices[0].message.content;
