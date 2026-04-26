@@ -73,7 +73,7 @@ function buildAxios(useProxy) {
   const axConfig = {
     baseURL:  cfg.baseUrl,
     headers:  { 'X-MBX-APIKEY': cfg.apiKey },
-    timeout:  12000,
+    timeout:  process.env.HTTPS_PROXY ? 30000 : 12000, // lebih lama jika pakai proxy
     proxy:    false, // default: matikan proxy env-var agar tidak auto-detect
   };
 
