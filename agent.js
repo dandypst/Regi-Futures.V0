@@ -448,13 +448,13 @@ async function gatherMarketData(symbol) {
   // Sequential fetch dengan delay kecil antar request
   // Mencegah proxy/rate-limit timeout saat banyak pairs diproses
   const klines4h  = await getKlines(symbol, '4h', 100).catch(() => []);
-  await sleep(150);
+  await sleep(80);
   const klines1h  = await getKlines(symbol, '1h', 100).catch(() => []);
-  await sleep(150);
+  await sleep(80);
   const klines15m = await getKlines(symbol, '15m', 60).catch(() => []);
-  await sleep(100);
+  await sleep(50);
   const ticker    = await getTicker(symbol).catch(() => null);
-  await sleep(100);
+  await sleep(50);
   const funding   = await getFundingRate(symbol).catch(() => null);
   const oi        = await getOpenInterest(symbol).catch(() => null);
 
@@ -476,6 +476,11 @@ async function gatherMarketData(symbol) {
   const fibExt    = calcFibExtension(klines4h);
   const fibCh     = calcFibChannel(klines4h);
   const ichimoku  = calcIchimoku(klines4h);
+
+  // Skip pair jika tidak ada data klines sama sekali (pair tidak aktif di testnet)
+  if (!klines4h.length && !klines1h.length) {
+    return { symbol, error: 'No klines data — pair mungkin tidak aktif di testnet' };
+  }
 
   return {
     symbol,
@@ -574,7 +579,7 @@ export async function runScreeningAgent(pairs) {
         return { symbol: s, error: e.message };
       }
     }),
-    500  // 500ms delay antar pair
+    200  // 200ms delay antar pair
   );
 
   const valid = marketDataAll.filter(d => !d.error && d.price);
