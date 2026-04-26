@@ -51,9 +51,9 @@ async function loadPairs() {
     return filtered;
   }
 
-  // Di live — fetch semua pairs dari Binance
+  // Di live — fetch pairs dari Binance, batasi ke maxAutoPairs
   try {
-    logger.info(MOD, 'autoPairs live — fetching semua pair dari Binance...');
+    logger.info(MOD, 'autoPairs live — fetching pairs dari Binance...');
     const allPairs = await getAllFuturesPairs({
       quoteAsset: config.autoPairsQuote    || 'USDT',
       perpOnly:   config.autoPairsPerpOnly !== false,
@@ -62,10 +62,13 @@ async function loadPairs() {
       logger.warn(MOD, 'Gagal fetch pairs — pakai config');
       return config.pairs?.length ? config.pairs : ['BTCUSDT', 'ETHUSDT'];
     }
-    const blacklist = config.pairsBlacklist || [];
-    const filtered  = blacklist.length ? allPairs.filter(p => !blacklist.includes(p)) : allPairs;
+    const blacklist   = config.pairsBlacklist || [];
+    const maxPairs    = config.maxAutoPairs   || 30; // default max 30 pairs
+    const filtered    = allPairs
+      .filter(p => !blacklist.includes(p))
+      .slice(0, maxPairs); // batasi jumlah pairs
     config.pairs    = filtered;
-    logger.sys(MOD, `autoPairs live: ${filtered.length} pairs aktif`);
+    logger.sys(MOD, `autoPairs live: ${filtered.length} pairs (max: ${maxPairs})`);
     try { broadcastState(); } catch (_) {}
     return filtered;
   } catch (e) {
